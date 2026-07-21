@@ -52,7 +52,7 @@ export default function Account() {
         isPro: session.isAdmin,
       });
       await syncWithRemote(session.userId);
-      router.push('/onboarding/medication');
+      router.push('/onboarding/premium');
     } finally {
       setBusy(false);
     }
@@ -67,7 +67,7 @@ export default function Account() {
         scroll
         footer={<Button title="Create Account" loading={busy} disabled={!valid} onPress={submit} />}
       >
-        <OnboardingHeader step={3} />
+        <OnboardingHeader step={8} />
         <Text variant="title">Create your account</Text>
         <Text variant="body" tone="secondary" style={{ marginTop: spacing.sm }}>
           {isSupabaseConfigured()

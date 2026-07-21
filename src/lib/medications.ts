@@ -1,8 +1,11 @@
 export type MedicationId =
   | 'ozempic'
   | 'wegovy'
-  | 'zepbound'
   | 'mounjaro'
+  | 'zepbound'
+  | 'saxenda'
+  | 'compounded_sema'
+  | 'compounded_tirz'
   | 'compounded'
   | 'other';
 
@@ -34,14 +37,6 @@ export const MEDICATIONS: Medication[] = [
     unit: 'mg',
   },
   {
-    id: 'zepbound',
-    name: 'Zepbound',
-    molecule: 'Tirzepatide',
-    halfLifeHours: 120,
-    doses: [2.5, 5, 7.5, 10, 12.5, 15],
-    unit: 'mg',
-  },
-  {
     id: 'mounjaro',
     name: 'Mounjaro',
     molecule: 'Tirzepatide',
@@ -50,11 +45,35 @@ export const MEDICATIONS: Medication[] = [
     unit: 'mg',
   },
   {
-    id: 'compounded',
-    name: 'Compounded',
-    molecule: 'Semaglutide / Tirzepatide',
-    halfLifeHours: 150,
-    doses: [0.25, 0.5, 1.0, 1.7, 2.4, 5, 7.5, 10],
+    id: 'zepbound',
+    name: 'Zepbound',
+    molecule: 'Tirzepatide',
+    halfLifeHours: 120,
+    doses: [2.5, 5, 7.5, 10, 12.5, 15],
+    unit: 'mg',
+  },
+  {
+    id: 'saxenda',
+    name: 'Saxenda',
+    molecule: 'Liraglutide',
+    halfLifeHours: 13,
+    doses: [0.6, 1.2, 1.8, 2.4, 3.0],
+    unit: 'mg',
+  },
+  {
+    id: 'compounded_sema',
+    name: 'Compounded Semaglutide',
+    molecule: 'Semaglutide',
+    halfLifeHours: 168,
+    doses: [0.25, 0.5, 1.0, 1.7, 2.4],
+    unit: 'mg',
+  },
+  {
+    id: 'compounded_tirz',
+    name: 'Compounded Tirzepatide',
+    molecule: 'Tirzepatide',
+    halfLifeHours: 120,
+    doses: [2.5, 5, 7.5, 10, 12.5, 15],
     unit: 'mg',
   },
   {

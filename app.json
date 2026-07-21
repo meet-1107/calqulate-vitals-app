@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Calqulate",
+    "name": "Calqulate Vitals",
     "slug": "calqulate",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,9 +18,7 @@
     },
     "android": {
       "package": "com.calqulate.app",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "googleServicesFile": "./google-services.json",
       "permissions": [
         "POST_NOTIFICATIONS"
       ]

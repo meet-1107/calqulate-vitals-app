@@ -22,13 +22,16 @@ export default function ReasonScreen() {
   // Tap once, advance automatically — no second confirm tap.
   const choose = (id: Reason) => {
     patchProfile({ reason: id });
-    setTimeout(() => router.push('/onboarding/account'), 220);
+    setTimeout(() => router.push('/onboarding/medication'), 220);
   };
 
   return (
     <Screen>
       <OnboardingHeader step={2} />
-      <Text variant="title">Why are you here?</Text>
+      <Text variant="title">Let&apos;s personalize your experience</Text>
+      <Text variant="body" tone="secondary" style={{ marginTop: spacing.sm }}>
+        What brings you here?
+      </Text>
       <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
         {REASONS.map((r) => (
           <OptionCard

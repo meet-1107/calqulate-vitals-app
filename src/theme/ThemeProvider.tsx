@@ -19,5 +19,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+/** Forces a fixed scheme for everything inside, regardless of the app theme. */
+export function ThemeScope({ scheme, children }: { scheme: 'light' | 'dark'; children: ReactNode }) {
+  const value = useMemo(() => ({ colors: themes[scheme], scheme }), [scheme]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
 export const useTheme = () => useContext(ThemeContext);
 export const useColors = () => useContext(ThemeContext).colors;

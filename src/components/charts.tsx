@@ -199,6 +199,245 @@ export function Meter({ percent, color, height = 10, segments = 12 }: MeterProps
   );
 }
 
+/**
+ * Two-segment horizontal stacked bar — "83% fat / 17% muscle" at a glance.
+ * Segments are proportional; labels sit underneath.
+ */
+export function StackedBar({
+  a,
+  b,
+  aLabel,
+  bLabel,
+  aColor,
+  bColor,
+  height = 26,
+}: {
+  a: number;
+  b: number;
+  aLabel: string;
+  bLabel: string;
+  aColor?: string;
+  bColor?: string;
+  height?: number;
+}) {
+  const c = useColors();
+  const total = a + b || 1;
+  const aPct = Math.round((a / total) * 100);
+  const colA = aColor ?? c.primary;
+  const colB = bColor ?? c.pro;
+
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', height, borderRadius: radius.sm, overflow: 'hidden', gap: 2 }}>
+        <View style={{ flex: Math.max(a, 0.0001), backgroundColor: colA, borderRadius: radius.sm }} />
+        <View style={{ flex: Math.max(b, 0.0001), backgroundColor: colB, borderRadius: radius.sm }} />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colA }} />
+          <Text variant="caption" tone="secondary">
+            {aLabel} · {aPct}%
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colB }} />
+          <Text variant="caption" tone="secondary">
+            {bLabel} · {100 - aPct}%
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** Two-slice donut with a center label — body composition at a glance. */
+export function Donut({
+  a,
+  b,
+  size = 132,
+  stroke = 16,
+  label,
+  caption,
+  aColor,
+  bColor,
+}: {
+  a: number;
+  b: number;
+  size?: number;
+  stroke?: number;
+  label: string;
+  caption?: string;
+  aColor?: string;
+  bColor?: string;
+}) {
+  const c = useColors();
+  const colA = aColor ?? c.primary;
+  const colB = bColor ?? c.pro;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const total = a + b || 1;
+  const aLen = (a / total) * circumference;
+  const gap = 4;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colB}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${Math.max(0, circumference - aLen - gap)} ${aLen + gap}`}
+          strokeDashoffset={-aLen - gap / 2}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colA}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${Math.max(0, aLen - gap)} ${circumference - aLen + gap}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <Text variant="heading">{label}</Text>
+      {caption ? (
+        <Text variant="micro" tone="secondary">
+          {caption}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** Position gauge — a dot on a track with a verdict, e.g. muscle protection. */
+export function PositionGauge({
+  percent,
+  leftLabel,
+  rightLabel,
+  verdict,
+}: {
+  percent: number;
+  leftLabel: string;
+  rightLabel: string;
+  verdict: string;
+}) {
+  const c = useColors();
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <View>
+      <View style={{ height: 8, borderRadius: 4, backgroundColor: c.track }}>
+        <View
+          style={{
+            position: 'absolute',
+            left: `${clamped}%`,
+            top: -5,
+            marginLeft: -9,
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: c.primary,
+            borderWidth: 3,
+            borderColor: c.card,
+          }}
+        />
+        <View
+          style={{
+            width: `${clamped}%`,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: c.primarySoft,
+          }}
+        />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }}>
+        <Text variant="micro" tone="tertiary">
+          {leftLabel}
+        </Text>
+        <Text variant="caption" tone="primary">
+          {verdict}
+        </Text>
+        <Text variant="micro" tone="tertiary">
+          {rightLabel}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Fat vs muscle river — two stacked areas over weeks. The fat band visibly
+ * shrinks while the lean band stays nearly constant.
+ */
+export function RiverChart({
+  weeks,
+  width,
+  height = 160,
+}: {
+  weeks: { label: string; fatMass: number; leanMass: number }[];
+  width: number;
+  height?: number;
+}) {
+  const c = useColors();
+  if (weeks.length < 2) {
+    return (
+      <View style={{ height, alignItems: 'center', justifyContent: 'center' }}>
+        <Text variant="caption" tone="tertiary">
+          A few weeks of weigh-ins unlocks this chart
+        </Text>
+      </View>
+    );
+  }
+
+  const pad = 8;
+  const labelH = 18;
+  const plotH = height - labelH;
+  const maxTotal = Math.max(...weeks.map((w) => w.fatMass + w.leanMass)) || 1;
+  const x = (i: number) => pad + (i / (weeks.length - 1)) * (width - pad * 2);
+  const y = (v: number) => plotH - (v / maxTotal) * (plotH - pad);
+
+  const leanTop = weeks.map((w, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(w.leanMass)}`).join(' ');
+  const leanArea = `${leanTop} L ${x(weeks.length - 1)} ${plotH} L ${x(0)} ${plotH} Z`;
+  const totalTop = weeks
+    .map((w, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(w.leanMass + w.fatMass)}`)
+    .join(' ');
+  const totalDown = weeks
+    .map((w, i) => `L ${x(weeks.length - 1 - i)} ${y(weeks[weeks.length - 1 - i].leanMass)}`)
+    .join(' ');
+  const fatArea = `${totalTop} ${totalDown} Z`;
+
+  return (
+    <View>
+      <Svg width={width} height={plotH}>
+        <Path d={fatArea} fill={c.pro} opacity={0.55} />
+        <Path d={leanArea} fill={c.primary} opacity={0.75} />
+        <Path d={totalTop} stroke={c.pro} strokeWidth={2} fill="none" />
+        <Path d={leanTop} stroke={c.primary} strokeWidth={2} fill="none" />
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', height: labelH, alignItems: 'flex-end' }}>
+        <Text variant="micro" tone="tertiary">{weeks[0].label}</Text>
+        <Text variant="micro" tone="tertiary">{weeks[weeks.length - 1].label}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.pro }} />
+          <Text variant="micro" tone="secondary">Fat</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
+          <Text variant="micro" tone="secondary">Muscle</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export function StatTile({
   label,
   value,

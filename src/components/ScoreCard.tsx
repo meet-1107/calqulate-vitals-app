@@ -12,7 +12,7 @@ import { radius, spacing } from '../theme';
  * The signature card. Score, band, and the headline that makes it a game:
  * how many points are still on the table today.
  */
-export function ScoreCard({ score }: { score: MetabolicScore }) {
+export function ScoreCard({ score, delta }: { score: MetabolicScore; delta?: number }) {
   const c = useColors();
   const { scheme } = useTheme();
   const router = useRouter();
@@ -30,9 +30,17 @@ export function ScoreCard({ score }: { score: MetabolicScore }) {
       }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
-          Metabolic Score
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
+            Metabolic Score
+          </Text>
+          {delta != null && delta !== 0 ? (
+            <Text variant="micro" tone={delta > 0 ? 'primary' : 'secondary'}>
+              {delta > 0 ? '↑' : '↓'} {delta > 0 ? '+' : ''}
+              {delta} pts
+            </Text>
+          ) : null}
+        </View>
         <Ionicons
           name="chevron-forward"
           size={18}

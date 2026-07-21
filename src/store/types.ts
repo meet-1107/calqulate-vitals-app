@@ -2,6 +2,8 @@ import type { MedicationId } from '../lib/medications';
 
 export type Reason = 'weight_loss' | 'diabetes' | 'health' | 'tracking';
 export type Units = 'lb' | 'kg';
+export type DoseUnit = 'mg' | 'mcg' | 'mL' | 'units';
+export type TrackArea = 'weight' | 'side_effects' | 'protein' | 'water' | 'activity' | 'blood_sugar';
 
 export type Settings = {
   theme: 'system' | 'light' | 'dark';
@@ -29,8 +31,14 @@ export type Profile = {
   reason: Reason | null;
   medication: MedicationId | null;
   doseMg: number | null;
+  /** Unit the user entered their dose in. Canonical numeric lives in doseMg. */
+  doseUnit: DoseUnit;
   injectionDay: number | null; // 0 = Sunday
   injectionHour: number; // 24h
+  /** Epoch ms of the next scheduled injection picked during onboarding. */
+  nextInjectionAt: number | null;
+  /** Areas the user chose to track during onboarding. */
+  trackAreas: TrackArea[];
   startWeight: number | null;
   goalWeight: number | null;
   isPro: boolean;
@@ -82,8 +90,11 @@ export const DEFAULT_STATE: AppState = {
     reason: null,
     medication: null,
     doseMg: null,
+    doseUnit: 'mg',
     injectionDay: null,
     injectionHour: 9,
+    nextInjectionAt: null,
+    trackAreas: ['weight', 'side_effects', 'protein', 'water', 'activity', 'blood_sugar'],
     startWeight: null,
     goalWeight: null,
     isPro: false,

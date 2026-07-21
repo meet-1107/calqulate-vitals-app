@@ -2,20 +2,37 @@ import { useMemo, useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Card, SectionTitle } from '../../src/components/Card';
-import { LineChart, Meter, Ring, StatTile } from '../../src/components/charts';
+import {
+  Donut,
+  LineChart,
+  Meter,
+  PositionGauge,
+  Ring,
+  RiverChart,
+  StackedBar,
+  StatTile,
+} from '../../src/components/charts';
 import { ProGate } from '../../src/components/Pro';
+import { Roadmap } from '../../src/components/Roadmap';
+import { StoryCards } from '../../src/components/StoryCards';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { DAY } from '../../src/lib/dates';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
+import { computeBenchmark } from '../../src/lib/benchmark';
+import { computeBodyComp, riverWeeks } from '../../src/lib/bodycomp';
 import {
   changeOverDays,
   computeToday,
+  detectPlateau,
   goalProgress,
   projectGoalDate,
+  projectedWeightAt,
+  projectionSeries,
   totalChange,
   weightSeries,
 } from '../../src/lib/insights';
+import { weeklyStory } from '../../src/lib/story';
 import { useProfile } from '../../src/store/profile';
 import { useColors, useTheme } from '../../src/theme/ThemeProvider';
 import { radius, spacing } from '../../src/theme';
@@ -87,10 +104,20 @@ export default function Progress() {
   // Free accounts see 90 days; the full timeline is what Vitals keeps forever.
   const windowDays = profile.isPro ? days : Math.min(days, FREE_HISTORY_DAYS);
 
-  const series = useMemo(() => {
+  // History inside the window plus the dotted "Future You" projection.
+  const projected = useMemo(() => projectionSeries(profile, logs, 12), [profile, logs]);
+  const chart = useMemo(() => {
     const cutoff = Date.now() - windowDays * DAY;
-    return weightSeries(logs).filter((p) => p.t >= cutoff);
-  }, [logs, windowDays]);
+    if (projected.projectedFrom == null) {
+      return { series: weightSeries(logs).filter((p) => p.t >= cutoff), projectedFrom: undefined };
+    }
+    const history = projected.series.slice(0, projected.projectedFrom + 1).filter((p) => p.t >= cutoff);
+    const future = projected.series.slice(projected.projectedFrom + 1);
+    return {
+      series: [...history, ...future],
+      projectedFrom: history.length > 0 ? history.length - 1 : undefined,
+    };
+  }, [logs, projected, windowDays]);
 
   const today = useMemo(() => computeToday(profile, logs), [profile, logs]);
   const total = totalChange(profile, logs);
@@ -98,13 +125,30 @@ export default function Progress() {
   const progress = goalProgress(profile, logs);
   const goalDate = projectGoalDate(profile, logs);
 
+  const comp = useMemo(() => computeBodyComp(profile, logs), [profile, logs]);
+  const river = useMemo(() => riverWeeks(profile, logs), [profile, logs]);
+  const plateau = useMemo(() => detectPlateau(profile, logs), [profile, logs]);
+  const benchmark = useMemo(() => computeBenchmark(profile, logs), [profile, logs]);
+  const stories = useMemo(() => weeklyStory(profile, logs), [profile, logs]);
+
+  const in4 = projectedWeightAt(profile, logs, 4);
+  const in8 = projectedWeightAt(profile, logs, 8);
+  const in12 = projectedWeightAt(profile, logs, 12);
+
   return (
     <Screen scroll>
       <Text variant="title" style={{ marginTop: spacing.sm }}>
         Progress
       </Text>
 
-      <SectionTitle>Weight</SectionTitle>
+      {stories.length > 0 ? (
+        <>
+          <SectionTitle>This week&apos;s story</SectionTitle>
+          <StoryCards cards={stories} />
+        </>
+      ) : null}
+
+      <SectionTitle>Body weight</SectionTitle>
       <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg }}>
           <StatTile
@@ -125,7 +169,17 @@ export default function Progress() {
             tone={total != null && total <= 0 ? 'down' : undefined}
           />
         </View>
-        <LineChart data={series} width={chartWidth} height={180} />
+        <LineChart
+          data={chart.series}
+          width={chartWidth}
+          height={180}
+          projectedFrom={chart.projectedFrom}
+        />
+        {chart.projectedFrom != null ? (
+          <Text variant="micro" tone="tertiary" style={{ marginTop: spacing.sm }}>
+            Dotted line: your projected path at the current pace
+          </Text>
+        ) : null}
         <View style={{ marginTop: spacing.lg }}>
           <RangeSelector value={days} onChange={setDays} locked={!profile.isPro} />
         </View>
@@ -136,18 +190,163 @@ export default function Progress() {
         ) : null}
       </Card>
 
+      {plateau ? (
+        <Card
+          style={{
+            marginTop: spacing.md,
+            flexDirection: 'row',
+            gap: spacing.md,
+            alignItems: 'flex-start',
+          }}
+        >
+          <Ionicons name="pause-circle" size={22} color={c.pro} />
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyStrong">Plateau detected · {plateau.days} days</Text>
+            <Text variant="caption" tone="secondary" style={{ marginTop: 4 }}>
+              {plateau.reason}
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+
+      {comp && comp.totalLost < 0 ? (
+        <>
+          <SectionTitle>Body composition journey</SectionTitle>
+          <Card style={{ gap: spacing.xl }}>
+            <View>
+              <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.md }}>
+                What you lost
+              </Text>
+              <StackedBar
+                a={comp.fatLost}
+                b={comp.leanLost}
+                aLabel={`Fat ${comp.fatLost.toFixed(1)} ${units}`}
+                bLabel={`Muscle ${comp.leanLost.toFixed(1)} ${units}`}
+              />
+            </View>
+
+            <View>
+              <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.md }}>
+                Fat vs muscle over time
+              </Text>
+              <RiverChart weeks={river} width={chartWidth} height={150} />
+            </View>
+
+            <View>
+              <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.lg }}>
+                Muscle protection
+              </Text>
+              <PositionGauge
+                percent={comp.musclePreservationPct}
+                leftLabel="At risk"
+                rightLabel="Protected"
+                verdict={`${comp.musclePreservationPct.toFixed(0)}% · ${comp.preservationBand}`}
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
+              <Donut
+                a={comp.leanMassNow}
+                b={comp.fatMassNow}
+                label={today.weight != null ? `${today.weight.toFixed(0)}` : '—'}
+                caption={units}
+              />
+              <View style={{ flex: 1, gap: spacing.md }}>
+                <StatTile label="Lean mass" value={comp.leanMassNow.toFixed(1)} unit={units} />
+                <StatTile label="Fat mass" value={comp.fatMassNow.toFixed(1)} unit={units} />
+                <StatTile label="Body fat" value={`${comp.bodyFatPctNow}`} unit="%" />
+              </View>
+            </View>
+
+            <Text variant="micro" tone="tertiary">
+              Estimated from your weight, protein and activity — not a body scan. Log consistently
+              to keep it honest.
+            </Text>
+          </Card>
+        </>
+      ) : null}
+
+      {benchmark && benchmark.verdict !== 'early' ? (
+        <>
+          <SectionTitle>Versus clinical trials</SectionTitle>
+          <Card style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+            <Ionicons
+              name={
+                benchmark.verdict === 'ahead'
+                  ? 'rocket'
+                  : benchmark.verdict === 'on-track'
+                    ? 'checkmark-circle'
+                    : 'time'
+              }
+              size={22}
+              color={benchmark.verdict === 'behind' ? c.textSecondary : c.primary}
+            />
+            <View style={{ flex: 1 }}>
+              <Text variant="bodyStrong">
+                {benchmark.verdict === 'ahead'
+                  ? `Ahead of the ${benchmark.trialName} trial average`
+                  : benchmark.verdict === 'on-track'
+                    ? `On track with the ${benchmark.trialName} trial average`
+                    : `Behind the ${benchmark.trialName} trial average — normal, everyone's pace differs`}
+              </Text>
+              <Text variant="caption" tone="secondary" style={{ marginTop: 4 }}>
+                Week {benchmark.weeks}: you −{benchmark.actualPct}% vs trial −{benchmark.expectedPct}% of
+                body weight.
+              </Text>
+            </View>
+          </Card>
+        </>
+      ) : null}
+
       <SectionTitle>Goal</SectionTitle>
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
         <Ring percent={progress} size={112} caption="to goal" />
         <View style={{ flex: 1, gap: spacing.md }}>
-          <StatTile
-            label="Start"
-            value={profile.startWeight?.toFixed(1) ?? '—'}
-            unit={units}
-          />
+          <StatTile label="Start" value={profile.startWeight?.toFixed(1) ?? '—'} unit={units} />
           <StatTile label="Goal" value={profile.goalWeight?.toFixed(1) ?? '—'} unit={units} />
         </View>
       </Card>
+
+      <SectionTitle>Future you</SectionTitle>
+      <ProGate feature="overview.goal-date">
+        <Card style={{ gap: spacing.lg }}>
+          {in4 != null || in8 != null || in12 != null ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              {(
+                [
+                  ['In 4 weeks', in4],
+                  ['In 8 weeks', in8],
+                  ['In 12 weeks', in12],
+                ] as const
+              ).map(([label, v]) => (
+                <StatTile key={label} label={label} value={v != null ? v.toFixed(1) : '—'} unit={units} />
+              ))}
+            </View>
+          ) : null}
+          <Text variant="body">
+            {goalDate
+              ? `At your current pace you reach ${profile.goalWeight} ${units} around ${goalDate.toLocaleDateString(
+                  undefined,
+                  { month: 'long', year: 'numeric' },
+                )}.`
+              : 'Log a few more weigh-ins and your projection will appear here.'}
+          </Text>
+        </Card>
+      </ProGate>
+
+      {profile.startWeight != null && profile.goalWeight != null && today.weight != null ? (
+        <>
+          <SectionTitle>Milestones</SectionTitle>
+          <Card>
+            <Roadmap
+              start={profile.startWeight}
+              goal={profile.goalWeight}
+              current={today.weight}
+              unit={units}
+            />
+          </Card>
+        </>
+      ) : null}
 
       <SectionTitle>Medication level</SectionTitle>
       <Card>
@@ -162,44 +361,6 @@ export default function Progress() {
           Estimated from your dose history. Not a clinical measurement.
         </Text>
       </Card>
-
-      <SectionTitle>Goal date</SectionTitle>
-      <ProGate feature="overview.goal-date">
-        <Card>
-          <Text variant="body">
-            {goalDate
-              ? `At your current pace you reach ${profile.goalWeight} ${units} around ${goalDate.toLocaleDateString(
-                  undefined,
-                  { month: 'long', year: 'numeric' },
-                )}.`
-              : 'Log a few more weigh-ins and your projected goal date will appear here.'}
-          </Text>
-        </Card>
-      </ProGate>
-
-      <SectionTitle>Muscle vs fat</SectionTitle>
-      <ProGate feature="glp1.muscle-guard">
-        <Card>
-          <Text variant="body" tone="secondary">
-            Connect a smart scale or log body-fat percentage to split your loss into fat and
-            lean mass.
-          </Text>
-        </Card>
-      </ProGate>
-
-      <SectionTitle>Weekly review</SectionTitle>
-      <ProGate feature="glp1.weekly-review">
-        <Card>
-          <Text variant="body">
-            {week != null
-              ? `You changed ${Math.abs(week).toFixed(1)} ${units} over the last 7 days.`
-              : 'Log at least two weigh-ins this week to unlock your report.'}
-          </Text>
-          <Text variant="caption" tone="secondary" style={{ marginTop: spacing.sm }}>
-            Hydration {today.hydrationPct}% · Protein {today.proteinG} g today
-          </Text>
-        </Card>
-      </ProGate>
     </Screen>
   );
 }

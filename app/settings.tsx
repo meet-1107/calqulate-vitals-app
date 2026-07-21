@@ -132,7 +132,7 @@ export default function Settings() {
           onPress={() => router.push('/onboarding/medication')}
         />
         <View style={{ height: 1, backgroundColor: c.border }} />
-        <Row label="Current dose" value={profile.doseMg ? `${profile.doseMg} mg` : '—'} />
+        <Row label="Current dose" value={profile.doseMg ? `${profile.doseMg} ${profile.doseUnit ?? 'mg'}` : '—'} />
       </Card>
 
       <SectionTitle>Subscription</SectionTitle>

@@ -23,7 +23,7 @@ export default function MedicationScreen() {
 
   return (
     <Screen scroll>
-      <OnboardingHeader step={4} />
+      <OnboardingHeader step={3} />
       <Text variant="title">Which medication are you taking?</Text>
       <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
         {MEDICATIONS.map((m) => (
