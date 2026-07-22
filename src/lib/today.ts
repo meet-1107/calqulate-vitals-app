@@ -68,18 +68,18 @@ function proteinTarget(profile: Profile, logs: LogEntry[]): { grams: number; bas
     const grams = Math.round(comp.leanMassNow * 1.0);
     return {
       grams: Math.max(60, Math.min(220, grams)),
-      basis: `1 g per lb of your ${Math.round(comp.leanMassNow)} lb lean mass`,
+      basis: `From ${Math.round(comp.leanMassNow)} lb lean mass`,
     };
   }
 
   const weights = logs.filter((l) => l.kind === 'weight').sort((a, b) => b.at - a.at);
   const lb = weights[0]?.value ?? profile.startWeight;
-  if (lb == null) return { grams: profile.goals.proteinG, basis: 'your daily goal' };
+  if (lb == null) return { grams: profile.goals.proteinG, basis: 'Your daily goal' };
 
   const grams = Math.round((lb / 2.2046226218) * 1.6);
   return {
     grams: Math.max(60, Math.min(220, grams)),
-    basis: '1.6 g per kg of body weight',
+    basis: '1.6 g per kg body weight',
   };
 }
 
@@ -120,13 +120,13 @@ function workoutWindow(logs: LogEntry[], phase: CyclePhase) {
       buckets.set(start, (buckets.get(start) ?? 0) + 1);
     }
     const [best] = [...buckets.entries()].sort((a, b) => b[1] - a[1])[0];
-    return { window: windowLabel(best), basis: 'when you usually train' };
+    return { window: windowLabel(best), basis: 'When you usually train' };
   }
 
   const start = phase === 'rising' ? 16 : 14;
   return {
     window: windowLabel(start),
-    basis: phase === 'rising' ? 'after early dose effects settle' : 'your steadiest energy today',
+    basis: phase === 'rising' ? 'After dose effects settle' : 'Your steadiest energy',
   };
 }
 

@@ -49,7 +49,7 @@ function Item({
         {value}
       </Text>
       {caption ? (
-        <Text variant="micro" tone="tertiary" numberOfLines={1}>
+        <Text variant="micro" tone="tertiary" numberOfLines={2}>
           {caption}
         </Text>
       ) : null}
@@ -125,7 +125,7 @@ export function TodayBriefing({ brief }: { brief: TodayBrief }) {
           icon="water-outline"
           label="HYDRATION GOAL"
           value={litres(brief.hydrationTarget)}
-          caption="from your body weight"
+          caption="From your body weight"
         />
         {brief.workout ? (
           <Item
