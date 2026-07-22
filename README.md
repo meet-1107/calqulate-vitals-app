@@ -167,6 +167,53 @@ Fat and muscle are split from the week's actual weight change by the model's
 lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
 until there is enough logged for the card to say anything true.
 
+## Predicting physiology, not the scale
+
+A user cannot control tomorrow's weight — water, glycogen and sodium move it a
+pound either way regardless of what they do. Predicting it means being wrong
+about something they check every morning.
+
+So the headline is **Tomorrow's Body Outlook** ([`outlook.ts`](src/lib/outlook.ts)):
+fat-loss efficiency, muscle preservation, recovery, hunger, each with a
+confidence. These are mechanisms the user controls and the model can actually
+predict. The scale number still appears, deliberately demoted to a reference
+line that says day-to-day movement is mostly water.
+
+**Ranked levers** replace generic advice. Each is re-scored through the
+composition engine, so the ordering is modelled rather than asserted, and a
+lever already at target is *dropped entirely* — nothing makes advice feel more
+automated than being told to eat more protein when you already hit your protein
+goal. Those show as "Already strong" instead.
+
+**Evidence ratings** ([`stats.ts`](src/lib/stats.ts)) are 1–4 stars from two
+sources: the user's own history, and clinical support for the lever itself.
+There is deliberately **no "similar users" source** — that needs a cohort we do
+not have, and a star for evidence that does not exist is a fabrication. The
+type is there for when it becomes real.
+
+## Real statistics
+
+Confidence is shown as a number, so it is computed as one: Pearson r, a t-test
+on that correlation, and a two-tailed p-value from the Student-t distribution
+via the regularized incomplete beta function. Verified against published
+critical values (t=2.228, df=10 → p=0.0500).
+
+The consequence that matters: **r = 0.4 scores 75% confidence at n = 10 but 97%
+at n = 60.** A hand-picked number would have got that backwards.
+
+## What your best weeks had in common
+
+[`bodyModel.ts`](src/lib/bodyModel.ts) ranks the user's weeks by fat-loss
+efficiency and reports the conditions that co-occurred in the top third — but
+only when a trait is *also meaningfully rarer in the other weeks*, since a trait
+present in every week explains nothing. This is a description of their history,
+not a causal claim, and the copy says so.
+
+**Your Body Model** shows completeness across six dimensions (protein
+sensitivity, exercise response, sleep, hydration, medication timing, plateau
+behaviour), each with what is still needed. Capped below 100 — a model of a
+living person is never finished.
+
 ## Body Intelligence™ — progressive disclosure
 
 The ladder, in [`src/lib/intelligence.ts`](src/lib/intelligence.ts):

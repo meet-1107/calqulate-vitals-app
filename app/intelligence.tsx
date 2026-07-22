@@ -7,6 +7,8 @@ import { Card, SectionTitle } from '../src/components/Card';
 import { Screen } from '../src/components/Screen';
 import { Text } from '../src/components/Text';
 import { STAGES, buildIntelligence, historyDays, todayObservation } from '../src/lib/intelligence';
+import { bodyOutlook, maxedLevers, rankLevers } from '../src/lib/outlook';
+import { bestWeeks, modelCompleteness, personalLeverConfidence } from '../src/lib/bodyModel';
 import { formatWeight } from '../src/lib/units';
 import { useProfile } from '../src/store/profile';
 import { useColors, useTheme } from '../src/theme/ThemeProvider';
@@ -22,7 +24,17 @@ const CHECKS = ['Weight', 'Protein', 'Sleep', 'Medication', 'Symptoms'];
  * progress bar that outstays its welcome reads as a loading screen, not a
  * ceremony.
  */
-function ModelReveal({ dataPoints, days, onDone }: { dataPoints: number; days: number; onDone: () => void }) {
+function ModelReveal({
+  dataPoints,
+  days,
+  patterns,
+  onDone,
+}: {
+  dataPoints: number;
+  days: number;
+  patterns: number;
+  onDone: () => void;
+}) {
   const c = useColors();
   const [step, setStep] = useState(0);
   const fade = useRef(new Animated.Value(0)).current;
@@ -44,7 +56,8 @@ function ModelReveal({ dataPoints, days, onDone }: { dataPoints: number; days: n
         Your body model is ready
       </Text>
       <Text variant="body" tone="secondary" style={{ textAlign: 'center' }}>
-        {dataPoints} data points over {days} days.
+        We observed {dataPoints} data points over {days} days
+        {patterns > 0 ? ` and found ${patterns} personal pattern${patterns === 1 ? '' : 's'}` : ''}.
       </Text>
 
       <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
@@ -76,6 +89,13 @@ export default function IntelligenceScreen() {
   const observations = useMemo(() => todayObservation(logs), [logs]);
   const days = historyDays(logs);
 
+  const learned = useMemo(() => modelCompleteness(profile, logs), [profile, logs]);
+  const outlook = useMemo(() => bodyOutlook(profile, logs), [profile, logs]);
+  const personal = useMemo(() => personalLeverConfidence(profile, logs), [profile, logs]);
+  const levers = useMemo(() => rankLevers(profile, logs, personal), [profile, logs, personal]);
+  const alreadyGood = useMemo(() => maxedLevers(profile, logs), [profile, logs]);
+  const weeks = useMemo(() => bestWeeks(profile, logs), [profile, logs]);
+
   // Fires once, the first time the model becomes ready.
   const [revealing, setRevealing] = useState(intel.modelReady && !profile.modelUnlockedAt);
 
@@ -85,6 +105,7 @@ export default function IntelligenceScreen() {
         <ModelReveal
           dataPoints={intel.dataPoints}
           days={days}
+          patterns={intel.patterns.length}
           onDone={() => {
             patchProfile({ modelUnlockedAt: Date.now() });
             setRevealing(false);
@@ -106,6 +127,22 @@ export default function IntelligenceScreen() {
           Body Intelligence
         </Text>
       </View>
+
+      {/* How much the engine actually understands about this person. */}
+      <Card style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <Text variant="bodyStrong">Your Body Model</Text>
+          <Text variant="heading" tone="primary">
+            {learned}%
+          </Text>
+        </View>
+        <View style={{ height: 8, borderRadius: 4, backgroundColor: c.track, overflow: 'hidden' }}>
+          <View style={{ width: `${learned}%`, height: '100%', backgroundColor: c.primary }} />
+        </View>
+        <Text variant="micro" tone="tertiary">
+          Learned from {intel.dataPoints} data points. It keeps improving as you log.
+        </Text>
+      </Card>
 
       {/* The ladder, so the user can see what is coming. */}
       <Card style={{ marginTop: spacing.lg, gap: spacing.md }}>
@@ -229,10 +266,10 @@ export default function IntelligenceScreen() {
         </>
       ) : null}
 
-      {/* WEEK 3 — the one free prediction */}
+      {/* WEEK 3 — physiology, not the scale */}
       {intel.prediction ? (
         <>
-          <SectionTitle>Tomorrow</SectionTitle>
+          <SectionTitle>Tomorrow&apos;s Body Outlook</SectionTitle>
           <LinearGradient
             colors={scheme === 'dark' ? [c.primarySoft, c.card] : [c.primarySoft, c.card]}
             start={{ x: 0, y: 0 }}
@@ -240,50 +277,124 @@ export default function IntelligenceScreen() {
             style={{
               borderRadius: radius.xl,
               padding: spacing.lg + 2,
-              gap: spacing.md,
+              gap: spacing.lg,
               borderWidth: scheme === 'dark' ? 1 : 0,
               borderColor: c.border,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <View>
-                <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
-                  Estimated weight
-                </Text>
-                <Text variant="hero" tone="primary">
-                  {formatWeight(intel.prediction.value, units)}
-                </Text>
-                <Text variant="caption" tone="secondary">
-                  {formatWeight(intel.prediction.low, units)} – {formatWeight(intel.prediction.high, units)}{' '}
-                  {units}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text variant="micro" tone="tertiary">
-                  CONFIDENCE
-                </Text>
-                <Text variant="heading">{intel.prediction.confidence}%</Text>
-              </View>
-            </View>
-
-            <View style={{ gap: spacing.sm }}>
-              <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
-                Why
-              </Text>
-              {intel.prediction.drivers.map((d) => (
-                <View key={d.label} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Ionicons
-                    name={d.good ? 'arrow-up-circle' : 'arrow-down-circle'}
-                    size={15}
-                    color={d.good ? c.primary : c.pro}
-                  />
-                  <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
-                    {d.label} — {d.detail}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg }}>
+              {[
+                { label: 'FAT LOSS EFFICIENCY', value: `${outlook.fatLossEfficiency}%`, tint: c.primary },
+                { label: 'MUSCLE PRESERVATION', value: `${outlook.musclePreservation}`, tint: c.primary },
+                { label: 'RECOVERY', value: outlook.recovery, tint: outlook.recovery === 'Low' ? c.pro : c.primary },
+                { label: 'HUNGER', value: outlook.hunger, tint: outlook.hunger === 'High' ? c.pro : c.primary },
+              ].map((m) => (
+                <View key={m.label} style={{ width: '50%', gap: 2 }}>
+                  <Text variant="micro" tone="tertiary">
+                    {m.label}
+                  </Text>
+                  <Text variant="title" style={{ color: m.tint }}>
+                    {m.value}
                   </Text>
                 </View>
               ))}
             </View>
+
+            <View style={{ gap: 4 }}>
+              <Text variant="caption" tone="secondary">
+                {outlook.recoveryWhy}
+              </Text>
+              <Text variant="micro" tone="tertiary">
+                Confidence {outlook.confidence}% · these are mechanisms you control, not a scale
+                reading you cannot
+              </Text>
+            </View>
           </LinearGradient>
+
+          {/* The scale number, deliberately secondary. */}
+          <Card style={{ marginTop: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <Ionicons name="scale-outline" size={18} color={c.textTertiary} />
+            <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+              For reference, the scale should read around{' '}
+              {formatWeight(intel.prediction.value, units)} {units} (
+              {formatWeight(intel.prediction.low, units)}–
+              {formatWeight(intel.prediction.high, units)}). Day-to-day movement is mostly water.
+            </Text>
+          </Card>
+
+          {/* Ranked opportunities — never suggesting what is already good. */}
+          <SectionTitle>Today&apos;s biggest opportunities</SectionTitle>
+          {levers.length ? (
+            levers.slice(0, 3).map((l, i) => (
+              <Card key={l.id} style={{ marginBottom: spacing.md, gap: spacing.sm }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                  <Text variant="heading" tone="tertiary">
+                    {i + 1}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyStrong">{l.title}</Text>
+                    <Text variant="micro" tone="tertiary" style={{ marginTop: 2 }}>
+                      {l.effect}
+                    </Text>
+                  </View>
+                  <Text variant="heading" tone="primary">
+                    +{l.gainPp}
+                  </Text>
+                </View>
+                <Text variant="caption" tone="secondary">
+                  {l.reason}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <Text variant="caption" tone="pro">
+                    {'★'.repeat(l.evidence.stars)}
+                    {'☆'.repeat(4 - l.evidence.stars)}
+                  </Text>
+                  <Text variant="micro" tone="tertiary">
+                    {l.evidence.label}
+                  </Text>
+                </View>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <Text variant="body" tone="secondary">
+                Nothing to improve today — every lever we track is already at target.
+              </Text>
+            </Card>
+          )}
+
+          {alreadyGood.length ? (
+            <Text variant="caption" tone="primary" style={{ marginBottom: spacing.md }}>
+              Already strong: {alreadyGood.join(' · ')}
+            </Text>
+          ) : null}
+
+          {/* What the best weeks had in common — behaviour patterns, not variables. */}
+          {weeks ? (
+            <>
+              <SectionTitle>What your best weeks had in common</SectionTitle>
+              <Card style={{ gap: spacing.md }}>
+                <Text variant="body" tone="secondary">
+                  Across {weeks.weeks} weeks, your {weeks.topCount} strongest shared these:
+                </Text>
+                {weeks.traits.map((t) => (
+                  <View key={t.label} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Ionicons name="checkmark-circle" size={16} color={c.primary} />
+                    <Text variant="body" style={{ flex: 1 }}>
+                      {t.label}
+                    </Text>
+                    <Text variant="micro" tone="tertiary">
+                      {t.hits}/{t.total}
+                    </Text>
+                  </View>
+                ))}
+                <Text variant="micro" tone="tertiary">
+                  Confidence: {weeks.confidence}. These co-occurred in your best weeks — that is a
+                  description of your history, not proof that one caused the other.
+                </Text>
+              </Card>
+            </>
+          ) : null}
 
           {/* The paywall, placed after the value rather than in front of it. */}
           {!profile.isPro ? (

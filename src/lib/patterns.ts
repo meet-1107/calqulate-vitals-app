@@ -21,10 +21,11 @@
 
 import { DAY, startOfDay } from './dates';
 import { computeToday } from './insights';
+import { correlate, MIN_PAIRS } from './stats';
+
+export { MIN_PAIRS };
 import type { LogEntry, Profile } from '../store/types';
 
-/** Below this many paired days, nothing is reported. */
-export const MIN_PAIRS = 10;
 /** Below this |r|, the relationship is too weak to be worth a card. */
 const MIN_R = 0.35;
 /** Symptom-timing needs this many symptom entries after a dose. */
@@ -38,33 +39,11 @@ export type Pattern = {
   n: number;
   /** Pearson r, when the pattern is a correlation. */
   r?: number;
+  /** Statistical confidence that the association is not chance, 0-100. */
+  confidence: number;
   strength: 'strong' | 'moderate';
   icon: string;
 };
-
-/** Pearson correlation. Returns null when the sample or the variance is too small. */
-export function pearson(xs: number[], ys: number[]): { r: number; n: number } | null {
-  const n = Math.min(xs.length, ys.length);
-  if (n < MIN_PAIRS) return null;
-
-  const mx = xs.reduce((a, b) => a + b, 0) / n;
-  const my = ys.reduce((a, b) => a + b, 0) / n;
-
-  let num = 0;
-  let dx = 0;
-  let dy = 0;
-  for (let i = 0; i < n; i++) {
-    const a = xs[i] - mx;
-    const b = ys[i] - my;
-    num += a * b;
-    dx += a * a;
-    dy += b * b;
-  }
-  if (dx === 0 || dy === 0) return null; // no variance — a flat line correlates with nothing
-
-  const r = num / Math.sqrt(dx * dy);
-  return Number.isFinite(r) ? { r, n } : null;
-}
 
 const strengthOf = (r: number): Pattern['strength'] => (Math.abs(r) >= 0.6 ? 'strong' : 'moderate');
 
@@ -146,6 +125,9 @@ export function symptomTiming(logs: LogEntry[]): Pattern | null {
     title: 'Your side effects have a schedule',
     detail: `${Math.round(share * 100)}% of your symptom entries land in ${labels[top]} after an injection. Planning lighter meals for that window usually helps.`,
     n: counted,
+    // A proportion, not a correlation: confidence grows with how lopsided the
+    // clustering is and how many events sit behind it.
+    confidence: Math.min(95, Math.round(share * 100 * Math.min(1, counted / 12) + 20)),
     strength: share >= 0.6 ? 'strong' : 'moderate',
     icon: 'time-outline',
   };
@@ -165,7 +147,7 @@ function proteinVsWeight(logs: LogEntry[]): Pattern | null {
   }
 
   const { xs, ys } = pair(protein, changes, 1);
-  const stat = pearson(xs, ys);
+  const stat = correlate(xs, ys);
   if (!stat || Math.abs(stat.r) < MIN_R) return null;
 
   const helping = stat.r < 0; // more protein, more weight lost next day
@@ -177,6 +159,7 @@ function proteinVsWeight(logs: LogEntry[]): Pattern | null {
       : `Your higher-protein days tend to be followed by flatter mornings — often just water shifting. Association across ${stat.n} paired days.`,
     n: stat.n,
     r: stat.r,
+    confidence: stat.confidence,
     strength: strengthOf(stat.r),
     icon: 'nutrition-outline',
   };
@@ -188,7 +171,7 @@ function sleepVsSymptoms(logs: LogEntry[]): Pattern | null {
   const severity = dailyMeans(logs, 'symptom');
 
   const { xs, ys } = pair(sleep, severity, 1);
-  const stat = pearson(xs, ys);
+  const stat = correlate(xs, ys);
   if (!stat || Math.abs(stat.r) < MIN_R) return null;
   if (stat.r > 0) return null; // only report the useful direction
 
@@ -198,6 +181,7 @@ function sleepVsSymptoms(logs: LogEntry[]): Pattern | null {
     detail: `After your shorter nights, you tend to report stronger symptoms the next day. Association across ${stat.n} paired days.`,
     n: stat.n,
     r: stat.r,
+    confidence: stat.confidence,
     strength: strengthOf(stat.r),
     icon: 'moon-outline',
   };
@@ -209,7 +193,7 @@ function hydrationVsSymptoms(logs: LogEntry[]): Pattern | null {
   const severity = dailyMeans(logs, 'symptom');
 
   const { xs, ys } = pair(water, severity);
-  const stat = pearson(xs, ys);
+  const stat = correlate(xs, ys);
   if (!stat || Math.abs(stat.r) < MIN_R || stat.r > 0) return null;
 
   return {
@@ -218,6 +202,7 @@ function hydrationVsSymptoms(logs: LogEntry[]): Pattern | null {
     detail: `Your better-hydrated days tend to be your easier ones. Association across ${stat.n} paired days.`,
     n: stat.n,
     r: stat.r,
+    confidence: stat.confidence,
     strength: strengthOf(stat.r),
     icon: 'water-outline',
   };
@@ -235,7 +220,7 @@ function coverageVsSymptoms(profile: Profile, logs: LogEntry[]): Pattern | null 
     ys.push(sev);
   }
 
-  const stat = pearson(xs, ys);
+  const stat = correlate(xs, ys);
   if (!stat || Math.abs(stat.r) < MIN_R) return null;
 
   return {
@@ -247,6 +232,7 @@ function coverageVsSymptoms(profile: Profile, logs: LogEntry[]): Pattern | null 
         : `Your symptoms ease as medication levels rise. Across ${stat.n} days.`,
     n: stat.n,
     r: stat.r,
+    confidence: stat.confidence,
     strength: strengthOf(stat.r),
     icon: 'pulse-outline',
   };
