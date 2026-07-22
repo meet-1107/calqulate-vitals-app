@@ -167,6 +167,42 @@ Fat and muscle are split from the week's actual weight change by the model's
 lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
 until there is enough logged for the card to say anything true.
 
+## Progress — a story, not a dashboard
+
+[`app/(tabs)/progress.tsx`](app/(tabs)/progress.tsx) is one long scroll in a
+deliberate order: where you are, how you got here, what your body is doing, what
+the engine has learned, and only then the charts. Someone opening this tab is
+asking "am I actually succeeding?" — that should be legible before any axis is.
+
+The hero is **your body story**, not the weight chart: days with Calqulate,
+total lost, the share that came from fat, injections logged — the sentence a
+chart cannot say.
+
+[`src/lib/progress.ts`](src/lib/progress.ts) supplies the rest:
+
+- **Journey milestones** with real dates, computed from when each threshold was
+  actually crossed.
+- **Monthly story** — weight, estimated fat, muscle preserved, best habit,
+  hardest day. "Hardest day" is the lowest-scoring day *that had entries*; a day
+  with nothing logged is an absence, not a struggle.
+- **Decision replay** finds the behaviour change that moved fat-loss efficiency
+  most, comparing several weeks either side. One good week after a change is a
+  coincidence, not a decision.
+- **Achievements** with real criteria and real progress bars. Nothing shows as
+  earned that has not been.
+- **Correlation explorer** (Pro) as a scatter with a fitted line — never a dual
+  axis, which would let any two measures be made to look related by choosing
+  scales.
+
+### Detrending, and why it matters
+
+Both series in the explorer are **detrended before correlating**. Without it the
+feature is a spurious-correlation machine: over a successful few months protein
+drifts up while weight drifts down, so the two correlate at r = −0.87 purely
+because both move with time — and the app would present that as "your protein is
+driving your loss". After detrending the same data reads r = −0.00 at 3%
+confidence, which is the truth.
+
 ## Predicting physiology, not the scale
 
 A user cannot control tomorrow's weight — water, glycogen and sodium move it a

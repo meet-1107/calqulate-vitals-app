@@ -1,369 +1,544 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Card, SectionTitle } from '../../src/components/Card';
-import {
-  Donut,
-  LineChart,
-  Meter,
-  PositionGauge,
-  Ring,
-  RiverChart,
-  StackedBar,
-  StatTile,
-} from '../../src/components/charts';
+import { Donut } from '../../src/components/charts';
+import { Badge, Scatter, Timeline } from '../../src/components/progress-parts';
 import { ProGate } from '../../src/components/Pro';
-import { Roadmap } from '../../src/components/Roadmap';
-import { StoryCards } from '../../src/components/StoryCards';
+import { RangePicker } from '../../src/components/RangePicker';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
+import { WeightChart } from '../../src/components/WeightChart';
 import { DAY } from '../../src/lib/dates';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
-import { formatWeight } from '../../src/lib/units';
-import { computeBenchmark } from '../../src/lib/benchmark';
-import { computeBodyComp, riverWeeks } from '../../src/lib/bodycomp';
+import { estimateComposition, gatherInputs } from '../../src/lib/composition';
+import { modelCompleteness } from '../../src/lib/bodyModel';
+import { findPatterns } from '../../src/lib/patterns';
+import { predictTomorrow } from '../../src/lib/prediction';
+import { goalProgress, totalChange, weightSeries } from '../../src/lib/insights';
+import { dayIndex } from '../../src/lib/journey';
 import {
-  changeOverDays,
-  computeToday,
-  detectPlateau,
-  goalProgress,
-  projectGoalDate,
-  projectedWeightAt,
-  projectionSeries,
-  totalChange,
-  weightSeries,
-} from '../../src/lib/insights';
-import { weeklyStory } from '../../src/lib/story';
+  METRICS,
+  achievements,
+  decisionReplay,
+  explore,
+  journeyMilestones,
+  monthlyStory,
+  type MetricId,
+} from '../../src/lib/progress';
+import { formatWeight } from '../../src/lib/units';
 import { useProfile } from '../../src/store/profile';
 import { useColors, useTheme } from '../../src/theme/ThemeProvider';
 import { radius, spacing } from '../../src/theme';
 
-const RANGES = [
-  { label: '1W', days: 7 },
-  { label: '1M', days: 30 },
-  { label: '3M', days: 90 },
-  { label: 'All', days: 3650, premium: true },
-];
-
-function RangeSelector({
-  value,
-  onChange,
-  locked,
-}: {
-  value: number;
-  onChange: (d: number) => void;
-  locked: boolean;
-}) {
-  const c = useColors();
-  const { scheme } = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        padding: 3,
-        borderRadius: radius.pill,
-        backgroundColor: scheme === 'dark' ? c.cardAlt : c.bgElevated,
-      }}
-    >
-      {RANGES.map((r) => {
-        const gated = !!r.premium && locked;
-        return (
-          <Pressable
-            key={r.label}
-            onPress={() => onChange(r.days)}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              gap: 3,
-              paddingVertical: spacing.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: radius.pill,
-              backgroundColor: value === r.days ? c.card : 'transparent',
-            }}
-          >
-            <Text variant="caption" tone={value === r.days ? 'default' : 'secondary'}>
-              {r.label}
-            </Text>
-            {gated ? <Ionicons name="lock-closed" size={11} color={c.pro} /> : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
+/**
+ * Progress — a transformation story, not an analytics page.
+ *
+ * The order is deliberate: where you are, how you got here, what your body is
+ * doing, what the engine has learned, and only then the charts. A user opening
+ * this tab is asking "am I actually succeeding?", and the answer should be
+ * legible before any axis is.
+ */
 export default function Progress() {
   const c = useColors();
+  const { scheme } = useTheme();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { profile, logs } = useProfile();
-  const [days, setDays] = useState(30);
 
   const units = profile.settings.units;
-  const chartWidth = width - spacing.xl * 2 - (spacing.lg + 2) * 2;
+  const now = Date.now();
+  const cardWidth = width - spacing.xl * 2 - (spacing.lg + 2) * 2;
 
-  // Free accounts see 90 days; the full timeline is what Vitals keeps forever.
-  const windowDays = profile.isPro ? days : Math.min(days, FREE_HISTORY_DAYS);
+  const [range, setRange] = useState(30);
+  const [xMetric, setXMetric] = useState<MetricId>('protein');
+  const [yMetric, setYMetric] = useState<MetricId>('weight');
 
-  // History inside the window plus the dotted "Future You" projection.
-  const projected = useMemo(() => projectionSeries(profile, logs, 12), [profile, logs]);
-  const chart = useMemo(() => {
-    const cutoff = Date.now() - windowDays * DAY;
-    if (projected.projectedFrom == null) {
-      return { series: weightSeries(logs).filter((p) => p.t >= cutoff), projectedFrom: undefined };
-    }
-    const history = projected.series.slice(0, projected.projectedFrom + 1).filter((p) => p.t >= cutoff);
-    const future = projected.series.slice(projected.projectedFrom + 1);
-    return {
-      series: [...history, ...future],
-      projectedFrom: history.length > 0 ? history.length - 1 : undefined,
-    };
-  }, [logs, projected, windowDays]);
-
-  const today = useMemo(() => computeToday(profile, logs), [profile, logs]);
-  const total = totalChange(profile, logs);
-  const week = changeOverDays(logs, 7);
+  const lost = totalChange(profile, logs);
   const progress = goalProgress(profile, logs);
-  const goalDate = projectGoalDate(profile, logs);
+  const day = useMemo(() => dayIndex(logs, now), [logs, now]);
+  const learned = useMemo(() => modelCompleteness(profile, logs), [profile, logs]);
+  const milestones = useMemo(
+    () => journeyMilestones(profile, logs, units, now),
+    [profile, logs, units, now],
+  );
 
-  const comp = useMemo(() => computeBodyComp(profile, logs), [profile, logs]);
-  const river = useMemo(() => riverWeeks(profile, logs), [profile, logs]);
-  const plateau = useMemo(() => detectPlateau(profile, logs), [profile, logs]);
-  const benchmark = useMemo(() => computeBenchmark(profile, logs), [profile, logs]);
-  const stories = useMemo(() => weeklyStory(profile, logs), [profile, logs]);
+  const windowDays = profile.isPro ? range : Math.min(range, FREE_HISTORY_DAYS);
+  const series = useMemo(
+    () => weightSeries(logs).filter((p) => p.t >= now - windowDays * DAY),
+    [logs, windowDays, now],
+  );
 
-  const in4 = projectedWeightAt(profile, logs, 4);
-  const in8 = projectedWeightAt(profile, logs, 8);
-  const in12 = projectedWeightAt(profile, logs, 12);
+  const comp = useMemo(() => {
+    const { input, context } = gatherInputs(profile, logs, now);
+    return estimateComposition(input, context);
+  }, [profile, logs, now]);
+
+  const patterns = useMemo(() => findPatterns(profile, logs), [profile, logs]);
+  const story = useMemo(() => monthlyStory(profile, logs, 0, now), [profile, logs, now]);
+  const replay = useMemo(() => decisionReplay(profile, logs, now), [profile, logs, now]);
+  const badges = useMemo(() => achievements(profile, logs, units, now), [profile, logs, units, now]);
+  const prediction = useMemo(() => predictTomorrow(profile, logs, now), [profile, logs, now]);
+  const scatter = useMemo(() => explore(logs, xMetric, yMetric), [logs, xMetric, yMetric]);
+
+  const latest = weightSeries(logs).at(-1)?.value ?? profile.startWeight;
+  const doses = logs.filter((l) => l.kind === 'dose').length;
 
   return (
     <Screen scroll>
-      <Text variant="title" style={{ marginTop: spacing.sm }}>
-        Progress
-      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: spacing.sm,
+          marginBottom: spacing.lg,
+        }}
+      >
+        <Text variant="title">Progress</Text>
+        <Pressable onPress={() => router.push('/report')} hitSlop={10}>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: radius.pill,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: c.primarySoft,
+            }}
+          >
+            <Ionicons name="share-outline" size={18} color={c.primary} />
+          </View>
+        </Pressable>
+      </View>
 
-      {stories.length > 0 ? (
-        <>
-          <SectionTitle>This week&apos;s story</SectionTitle>
-          <StoryCards cards={stories} />
-        </>
-      ) : null}
-
-      <SectionTitle>Body weight</SectionTitle>
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg }}>
-          <StatTile
-            label="Current"
-            value={today.weight != null ? today.weight.toFixed(1) : '—'}
-            unit={units}
-          />
-          <StatTile
-            label="This week"
-            value={week != null ? `${week <= 0 ? '−' : '+'}${Math.abs(week).toFixed(1)}` : '—'}
-            unit={units}
-            tone={week != null && week <= 0 ? 'down' : undefined}
-          />
-          <StatTile
-            label="Total"
-            value={total != null ? `${total <= 0 ? '−' : '+'}${Math.abs(total).toFixed(1)}` : '—'}
-            unit={units}
-            tone={total != null && total <= 0 ? 'down' : undefined}
-          />
-        </View>
-        <LineChart
-          data={chart.series}
-          width={chartWidth}
-          height={180}
-          projectedFrom={chart.projectedFrom}
-        />
-        {chart.projectedFrom != null ? (
-          <Text variant="micro" tone="tertiary" style={{ marginTop: spacing.sm }}>
-            Dotted line: your projected path at the current pace
-          </Text>
-        ) : null}
-        <View style={{ marginTop: spacing.lg }}>
-          <RangeSelector value={days} onChange={setDays} locked={!profile.isPro} />
-        </View>
-        {!profile.isPro && days > FREE_HISTORY_DAYS ? (
-          <Text variant="caption" tone="pro" style={{ marginTop: spacing.md }}>
-            Showing the last {FREE_HISTORY_DAYS} days. Vitals keeps your full timeline.
-          </Text>
-        ) : null}
-      </Card>
-
-      {plateau ? (
-        <Card
-          style={{
-            marginTop: spacing.md,
-            flexDirection: 'row',
-            gap: spacing.md,
-            alignItems: 'flex-start',
-          }}
+      {/* 1 — Your body story. The narrative, before any chart. */}
+      <LinearGradient
+        colors={scheme === 'dark' ? [c.primarySoft, c.card] : [c.primarySoft, c.card]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          borderRadius: 28,
+          padding: spacing.xl,
+          gap: spacing.lg,
+          borderWidth: scheme === 'dark' ? 1 : 0,
+          borderColor: c.border,
+        }}
+      >
+        <View
+          style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
         >
-          <Ionicons name="pause-circle" size={22} color={c.pro} />
           <View style={{ flex: 1 }}>
-            <Text variant="bodyStrong">Plateau detected · {plateau.days} days</Text>
-            <Text variant="caption" tone="secondary" style={{ marginTop: 4 }}>
-              {plateau.reason}
+            <Text variant="caption" tone="secondary">
+              Total weight lost
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+              <Text variant="hero" tone="primary">
+                {lost != null && lost < 0 ? formatWeight(Math.abs(lost), units) : '0'}
+              </Text>
+              <Text variant="heading" tone="secondary">
+                {units}
+              </Text>
+            </View>
+            <Text variant="caption" tone="secondary" style={{ marginTop: 2 }}>
+              {progress}% of your goal
             </Text>
           </View>
-        </Card>
-      ) : null}
 
-      {comp && comp.totalLost < 0 ? (
-        <>
-          <SectionTitle>Body composition journey</SectionTitle>
-          <Card style={{ gap: spacing.xl }}>
-            <View>
-              <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.md }}>
-                What you lost
-              </Text>
-              <StackedBar
-                a={comp.fatLost}
-                b={comp.leanLost}
-                aLabel={`Fat ${formatWeight(comp.fatLost, units)} ${units}`}
-                bLabel={`Muscle ${formatWeight(comp.leanLost, units)} ${units}`}
-              />
-            </View>
-
-            <View>
-              <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.md }}>
-                Fat vs muscle over time
-              </Text>
-              <RiverChart weeks={river} width={chartWidth} height={150} />
-            </View>
-
-            <View>
-              <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.lg }}>
-                Muscle protection
-              </Text>
-              <PositionGauge
-                percent={comp.musclePreservationPct}
-                leftLabel="At risk"
-                rightLabel="Protected"
-                verdict={`${comp.musclePreservationPct.toFixed(0)}% · ${comp.preservationBand}`}
-              />
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
-              <Donut
-                a={comp.leanMassNow}
-                b={comp.fatMassNow}
-                label={today.weight != null ? `${today.weight.toFixed(0)}` : '—'}
-                caption={units}
-              />
-              <View style={{ flex: 1, gap: spacing.md }}>
-                <StatTile label="Lean mass" value={comp.leanMassNow.toFixed(1)} unit={units} />
-                <StatTile label="Fat mass" value={comp.fatMassNow.toFixed(1)} unit={units} />
-                <StatTile label="Body fat" value={`${comp.bodyFatPctNow}`} unit="%" />
-              </View>
-            </View>
-
+          <View style={{ alignItems: 'center' }}>
             <Text variant="micro" tone="tertiary">
-              Estimated from your weight, protein and activity — not a body scan. Log consistently
-              to keep it honest.
+              BODY MODEL
             </Text>
+            <Text variant="title" tone="primary">
+              {learned}%
+            </Text>
+            <Text variant="micro" tone="secondary">
+              learned
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ height: 8, borderRadius: 4, backgroundColor: c.track, overflow: 'hidden' }}>
+          <View style={{ width: `${progress}%`, height: '100%', backgroundColor: c.primary }} />
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text variant="micro" tone="tertiary">
+            Started{' '}
+            {profile.startWeight != null
+              ? `${formatWeight(profile.startWeight, units)} ${units}`
+              : '—'}
+          </Text>
+          <Text variant="micro" tone="tertiary">
+            Now {latest != null ? `${formatWeight(latest, units)} ${units}` : '—'}
+          </Text>
+          <Text variant="micro" tone="tertiary">
+            Goal{' '}
+            {profile.goalWeight != null ? `${formatWeight(profile.goalWeight, units)} ${units}` : '—'}
+          </Text>
+        </View>
+
+        {/* The narrative line — the thing a chart cannot say. */}
+        <Text variant="body" tone="secondary">
+          {`You have been with Calqulate for ${day} days${
+            lost != null && lost < 0 ? `, lost ${formatWeight(Math.abs(lost), units)} ${units}` : ''
+          }, kept an estimated ${comp.fatPct}% of that loss coming from fat, and logged ${doses} injection${
+            doses === 1 ? '' : 's'
+          }.`}
+        </Text>
+      </LinearGradient>
+
+      {/* 2 — Journey timeline */}
+      {milestones.length ? (
+        <>
+          <SectionTitle>Your journey</SectionTitle>
+          <Card>
+            <Timeline milestones={milestones} />
           </Card>
         </>
       ) : null}
 
-      {benchmark && benchmark.verdict !== 'early' ? (
-        <>
-          <SectionTitle>Versus clinical trials</SectionTitle>
-          <Card style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-            <Ionicons
-              name={
-                benchmark.verdict === 'ahead'
-                  ? 'rocket'
-                  : benchmark.verdict === 'on-track'
-                    ? 'checkmark-circle'
-                    : 'time'
-              }
-              size={22}
-              color={benchmark.verdict === 'behind' ? c.textSecondary : c.primary}
-            />
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyStrong">
-                {benchmark.verdict === 'ahead'
-                  ? `Ahead of the ${benchmark.trialName} trial average`
-                  : benchmark.verdict === 'on-track'
-                    ? `On track with the ${benchmark.trialName} trial average`
-                    : `Behind the ${benchmark.trialName} trial average — normal, everyone's pace differs`}
-              </Text>
-              <Text variant="caption" tone="secondary" style={{ marginTop: 4 }}>
-                Week {benchmark.weeks}: you −{benchmark.actualPct}% vs trial −{benchmark.expectedPct}% of
-                body weight.
+      {/* 3 — Weight trend */}
+      <SectionTitle>Weight trend</SectionTitle>
+      <Card style={{ gap: spacing.lg }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+          <RangePicker
+            value={range}
+            onChange={setRange}
+            lockedFrom={profile.isPro ? undefined : FREE_HISTORY_DAYS}
+          />
+        </View>
+        <WeightChart
+          data={series}
+          units={units}
+          width={cardWidth}
+          height={210}
+          goal={profile.goalWeight}
+        />
+      </Card>
+
+      {/* 4 — Body composition */}
+      <SectionTitle>Body composition</SectionTitle>
+      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
+        <Donut
+          a={comp.fatPct}
+          b={comp.leanPct}
+          size={132}
+          stroke={18}
+          label="Estimated"
+          caption={`${comp.confidence}% confident`}
+        />
+        <View style={{ flex: 1, gap: spacing.md }}>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
+              <Text variant="caption" tone="secondary">
+                Fat mass
               </Text>
             </View>
-          </Card>
-        </>
-      ) : null}
-
-      <SectionTitle>Goal</SectionTitle>
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
-        <Ring percent={progress} size={112} caption="to goal" />
-        <View style={{ flex: 1, gap: spacing.md }}>
-          <StatTile label="Start" value={profile.startWeight != null ? formatWeight(profile.startWeight, units) : '—'} unit={units} />
-          <StatTile label="Goal" value={profile.goalWeight != null ? formatWeight(profile.goalWeight, units) : '—'} unit={units} />
+            <Text variant="heading">{comp.fatPct}%</Text>
+          </View>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.pro }} />
+              <Text variant="caption" tone="secondary">
+                Lean mass
+              </Text>
+            </View>
+            <Text variant="heading">{comp.leanPct}%</Text>
+          </View>
+          <Pressable onPress={() => router.push('/composition')}>
+            <Text variant="caption" tone="primary">
+              Open the engine →
+            </Text>
+          </Pressable>
         </View>
       </Card>
 
-      <SectionTitle>Future you</SectionTitle>
-      <ProGate feature="overview.goal-date">
-        <Card style={{ gap: spacing.lg }}>
-          {in4 != null || in8 != null || in12 != null ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              {(
-                [
-                  ['In 4 weeks', in4],
-                  ['In 8 weeks', in8],
-                  ['In 12 weeks', in12],
-                ] as const
-              ).map(([label, v]) => (
-                <StatTile key={label} label={label} value={v != null ? v.toFixed(1) : '—'} unit={units} />
-              ))}
+      {/* 5 — Body Intelligence insights */}
+      <SectionTitle
+        action={
+          <Pressable onPress={() => router.push('/intelligence')}>
+            <Text variant="caption" tone="primary">
+              See all
+            </Text>
+          </Pressable>
+        }
+      >
+        Body Intelligence
+      </SectionTitle>
+      {patterns.length ? (
+        patterns.slice(0, 3).map((p) => (
+          <Card
+            key={p.id}
+            style={{ marginBottom: spacing.sm, flexDirection: 'row', gap: spacing.md }}
+          >
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: radius.pill,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.primarySoft,
+              }}
+            >
+              <Ionicons name={p.icon as keyof typeof Ionicons.glyphMap} size={17} color={c.primary} />
             </View>
-          ) : null}
-          <Text variant="body">
-            {goalDate
-              ? `At your current pace you reach ${formatWeight(profile.goalWeight!, units)} ${units} around ${goalDate.toLocaleDateString(
-                  undefined,
-                  { month: 'long', year: 'numeric' },
-                )}.`
-              : 'Log a few more weigh-ins and your projection will appear here.'}
+            <View style={{ flex: 1 }}>
+              <Text variant="body">{p.title}</Text>
+              <Text variant="micro" tone="primary" style={{ marginTop: 2 }}>
+                Confidence {p.confidence}% · {p.n} days
+              </Text>
+            </View>
+          </Card>
+        ))
+      ) : (
+        <Card>
+          <Text variant="body" tone="secondary">
+            Patterns appear once there are at least 10 days where two things were logged together.
+          </Text>
+        </Card>
+      )}
+
+      {/* 6 — Correlation explorer */}
+      <SectionTitle>Correlation explorer</SectionTitle>
+      <ProGate feature="intelligence.decision-engine">
+        <Card style={{ gap: spacing.lg }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm }}
+          >
+            {METRICS.map((m) => {
+              const active = xMetric === m.id;
+              return (
+                <Pressable
+                  key={m.id}
+                  onPress={() => {
+                    // Swap rather than collide when the two axes would match.
+                    if (m.id === yMetric) setYMetric(xMetric);
+                    setXMetric(m.id);
+                  }}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.sm,
+                    borderRadius: radius.pill,
+                    backgroundColor: active
+                      ? c.primary
+                      : scheme === 'dark'
+                        ? c.cardAlt
+                        : c.bgElevated,
+                  }}
+                >
+                  <Text variant="caption" style={{ color: active ? c.onPrimary : c.textSecondary }}>
+                    {m.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Scatter data={scatter} width={cardWidth} />
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+              {scatter.xLabel} vs {scatter.yLabel}
+            </Text>
+            {scatter.stat ? (
+              <Text variant="caption" tone="primary">
+                r = {scatter.stat.r.toFixed(2)} · {scatter.stat.confidence}% confident
+              </Text>
+            ) : (
+              <Text variant="caption" tone="tertiary">
+                Not enough paired days
+              </Text>
+            )}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm }}
+          >
+            {METRICS.filter((m) => m.id !== xMetric).map((m) => (
+              <Pressable
+                key={m.id}
+                onPress={() => setYMetric(m.id)}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radius.pill,
+                  borderWidth: 1,
+                  borderColor: yMetric === m.id ? c.pro : c.border,
+                }}
+              >
+                <Text variant="caption" tone={yMetric === m.id ? 'pro' : 'tertiary'}>
+                  vs {m.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <Text variant="micro" tone="tertiary">
+            A relationship here is an association in your own logs. It does not establish that one
+            causes the other.
           </Text>
         </Card>
       </ProGate>
 
-      {profile.startWeight != null && profile.goalWeight != null && today.weight != null ? (
+      {/* 7 — Decision replay */}
+      {replay ? (
         <>
-          <SectionTitle>Milestones</SectionTitle>
-          <Card>
-            <Roadmap
-              start={profile.startWeight}
-              goal={profile.goalWeight}
-              current={today.weight}
-              unit={units}
-            />
+          <SectionTitle>Your best decision</SectionTitle>
+          <Card style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: radius.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: c.primarySoft,
+                }}
+              >
+                <Ionicons name="trending-up" size={19} color={c.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyStrong">{replay.change}</Text>
+                <Text variant="micro" tone="tertiary" style={{ marginTop: 2 }}>
+                  {replay.effect}
+                </Text>
+              </View>
+              <Text variant="heading" tone="primary">
+                +{replay.gainPp}
+              </Text>
+            </View>
+            <Text variant="caption" tone="secondary">
+              Comparing {replay.weeksBefore} weeks before with {replay.weeksAfter} after. Confidence:{' '}
+              {replay.confidence}.
+            </Text>
           </Card>
         </>
       ) : null}
 
-      <SectionTitle>Medication level</SectionTitle>
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
-          <Text variant="body" tone="secondary">
-            Right now
-          </Text>
-          <Text variant="bodyStrong">{today.medicationLevel}%</Text>
-        </View>
-        <Meter percent={today.medicationLevel} />
-        <Text variant="caption" tone="tertiary" style={{ marginTop: spacing.md }}>
-          Estimated from your dose history. Not a clinical measurement.
+      {/* 8 — Monthly story */}
+      {story ? (
+        <>
+          <SectionTitle>{story.label}</SectionTitle>
+          <Card style={{ gap: spacing.md }}>
+            {[
+              {
+                label: 'Weight lost',
+                value:
+                  story.weightLost != null && story.weightLost < 0
+                    ? `${formatWeight(Math.abs(story.weightLost), units)} ${units}`
+                    : '—',
+              },
+              {
+                label: 'Estimated fat lost',
+                value:
+                  story.fatLost != null && story.fatLost < 0
+                    ? `${formatWeight(Math.abs(story.fatLost), units)} ${units}`
+                    : '—',
+              },
+              { label: 'Muscle preserved', value: story.musclePreserved },
+              { label: 'Best habit', value: story.bestHabit ?? '—' },
+              {
+                label: 'Hardest day',
+                value: story.hardestDay
+                  ? new Date(story.hardestDay.at).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : '—',
+              },
+            ].map((row) => (
+              <View
+                key={row.label}
+                style={{ flexDirection: 'row', justifyContent: 'space-between' }}
+              >
+                <Text variant="body" tone="secondary">
+                  {row.label}
+                </Text>
+                <Text variant="bodyStrong" tone="primary">
+                  {row.value}
+                </Text>
+              </View>
+            ))}
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: spacing.sm,
+                padding: spacing.md,
+                borderRadius: radius.lg,
+                backgroundColor: c.primarySoft,
+              }}
+            >
+              <Ionicons name="sparkles" size={16} color={c.primary} />
+              <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+                {story.summary}
+              </Text>
+            </View>
+          </Card>
+        </>
+      ) : null}
+
+      {/* 9 — Prediction: the shape is free, the detail is not. */}
+      <SectionTitle>What comes next</SectionTitle>
+      <Card style={{ gap: spacing.md }}>
+        <Text variant="body">
+          {prediction
+            ? prediction.dailySlope < -0.02
+              ? 'Steady progress expected — your trend is heading the right way.'
+              : prediction.dailySlope > 0.02
+                ? 'Your trend has flattened out. The next week is the one to watch.'
+                : 'Holding steady this week.'
+            : 'A few more weigh-ins and the forecast starts here.'}
         </Text>
+        <ProGate feature="intelligence.forecast">
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" tone="secondary">
+                Expected fat loss, next 7 days
+              </Text>
+              <Text variant="bodyStrong" tone="primary">
+                {prediction && prediction.dailySlope < 0
+                  ? `${formatWeight(
+                      Math.abs(prediction.dailySlope * 7 * (comp.fatPct / 100)),
+                      units,
+                    )} ${units}`
+                  : '—'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text variant="caption" tone="secondary">
+                Confidence
+              </Text>
+              <Text variant="bodyStrong">{prediction?.confidence ?? '—'}%</Text>
+            </View>
+          </View>
+        </ProGate>
       </Card>
+
+      {/* 10 — Achievements */}
+      <SectionTitle>Achievements</SectionTitle>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: spacing.md }}
+      >
+        {badges.map((b) => (
+          <Badge key={b.id} item={b} />
+        ))}
+      </ScrollView>
+
+      <Text variant="caption" tone="tertiary" style={{ marginTop: spacing.xl }}>
+        Body composition, fat loss and predictions are model estimates, not measurements.
+      </Text>
     </Screen>
   );
 }
