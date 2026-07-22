@@ -329,9 +329,9 @@ export default function Home() {
               ) : null}
             </View>
 
-            <Pressable onPress={() => router.push('/(tabs)/progress')}>
+            <Pressable onPress={() => router.push('/composition')}>
               <Text variant="caption" tone="primary">
-                Body composition →
+                Body Composition Engine →
               </Text>
             </Pressable>
           </Card>

@@ -115,6 +115,30 @@ export default function Settings() {
         />
       </Card>
 
+      {/* Feeds the Body Composition Engine. Age drives the sarcopenia term and a
+          measured body fat % replaces the population prior, which is the single
+          biggest lift to estimate confidence. */}
+      <SectionTitle>About you</SectionTitle>
+      <Card>
+        <Row
+          label="Age"
+          value={profile.birthYear ? `${new Date().getFullYear() - profile.birthYear}` : 'Not set'}
+          onPress={() => router.push('/about-you')}
+        />
+        <View style={{ height: 1, backgroundColor: c.border }} />
+        <Row
+          label="Height"
+          value={profile.heightCm ? `${profile.heightCm} cm` : 'Not set'}
+          onPress={() => router.push('/about-you')}
+        />
+        <View style={{ height: 1, backgroundColor: c.border }} />
+        <Row
+          label="Body fat"
+          value={profile.bodyFatPct ? `${profile.bodyFatPct}%` : 'Estimated'}
+          onPress={() => router.push('/about-you')}
+        />
+      </Card>
+
       <SectionTitle>Weight goal</SectionTitle>
       <Card>
         <Row

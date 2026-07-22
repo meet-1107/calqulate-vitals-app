@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -95,6 +96,7 @@ function RangeSelector({
 
 export default function Progress() {
   const c = useColors();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const { profile, logs } = useProfile();
   const [days, setDays] = useState(30);

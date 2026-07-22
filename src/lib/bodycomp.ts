@@ -18,6 +18,7 @@
 import { DAY, startOfDay } from './dates';
 import type { LogEntry, Profile } from '../store/types';
 import { weightSeries } from './insights';
+import { estimateComposition, gatherInputs } from './composition';
 
 export type BodyComp = {
   /** Total weight change since start; negative = lost. Profile units. */
@@ -63,29 +64,17 @@ function activeDaysPerWeek(logs: LogEntry[], days: number, now: number) {
   return (set.size / days) * 7;
 }
 
-/** Fraction of lost weight that was lean mass, 0.10–0.40. */
+/**
+ * Fraction of lost weight that was lean mass.
+ *
+ * Delegates to the Body Composition Engine so the coach, the weekly report, the
+ * home screen and the composition screen can never disagree about the same
+ * number. The engine anchors on Forbes' rule and modulates by behaviour; this
+ * wrapper exists only for the older call sites.
+ */
 export function leanLossFraction(profile: Profile, logs: LogEntry[], now = Date.now()): number {
-  let lean = 25;
-
-  const adherence = proteinAdherence(profile, logs, 28, now);
-  if (adherence >= 0.8) lean -= 10;
-  else if (adherence < 0.4) lean += 8;
-
-  if (activeDaysPerWeek(logs, 28, now) >= 3) lean -= 5;
-
-  const weights = weightSeries(logs);
-  const recent = weights.filter((w) => w.t >= now - 28 * DAY);
-  if (recent.length >= 2) {
-    const span = (recent[recent.length - 1].t - recent[0].t) / DAY;
-    const change = recent[recent.length - 1].value - recent[0].value;
-    const current = recent[recent.length - 1].value;
-    if (span >= 7 && current > 0) {
-      const weeklyPct = (-change / current) * (7 / span) * 100;
-      if (weeklyPct > 1) lean += 7;
-    }
-  }
-
-  return clamp(lean, 10, 40) / 100;
+  const { input, context } = gatherInputs(profile, logs, now);
+  return estimateComposition(input, context).leanPct / 100;
 }
 
 /**

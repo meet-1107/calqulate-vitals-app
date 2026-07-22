@@ -167,6 +167,45 @@ Fat and muscle are split from the week's actual weight change by the model's
 lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
 until there is enough logged for the card to say anything true.
 
+## Body Composition Engine™
+
+[`src/lib/composition.ts`](src/lib/composition.ts) estimates how a weight change
+splits into fat and lean tissue. Three layers, in order of authority:
+
+**1. Physiology.** The baseline is Forbes' rule — the leaner you already are, the
+more of any loss comes from lean tissue. It is a published relationship rather
+than a tuned constant, so it anchors everything else:
+
+```
+ΔFFM / ΔWeight ≈ 10.4 / (10.4 + FatMass_kg)
+```
+
+**2. Behaviour.** Protein, resistance training, sleep, hydration, loss rate, age
+and medication coverage modulate that baseline through the **Muscle Preservation
+Index** (weights sum to exactly 100). Behaviour moves the split a long way but
+cannot escape physiology, so the result stays bounded at 3–55% lean.
+
+**3. Energy conservation.** A kg of fat carries ~7700 kcal; a kg of lean tissue
+~1400, because lean mass is mostly water. When intake is known the partition is
+*solved* rather than estimated, and that path is weighted higher:
+
+```
+7 · deficit = ΔFat · 7700 + ΔLean · 1400
+```
+
+The engine reports **confidence, not certainty**. It rises with observed inputs
+and weigh-in depth, and is **capped at Moderate whenever body fat is a
+population prior rather than a measurement** — the Forbes baseline sits under
+every other number, so claiming "High" off an assumed starting point would be
+fake precision.
+
+[`/composition`](app/composition.tsx) shows the split, the MPI breakdown, the
+"why", the single highest-value change, and a **digital twin**: stack levers
+("30 g more protein", "two resistance sessions") and watch the partition move.
+
+`leanLossFraction` now delegates here, so the coach, the weekly report and the
+home screen can never disagree about the same number.
+
 ## Personal Coach
 
 [`src/lib/coach.ts`](src/lib/coach.ts) watches the dashboard and says one thing,

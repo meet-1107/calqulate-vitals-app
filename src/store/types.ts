@@ -28,6 +28,12 @@ export type Profile = {
   name: string;
   email: string;
   isAdmin: boolean;
+  /** Demographics for the body-composition model. Optional — absent lowers confidence. */
+  birthYear: number | null;
+  sex: 'male' | 'female' | 'other' | null;
+  heightCm: number | null;
+  /** Measured body fat %, when the user has a scan or smart scale. */
+  bodyFatPct: number | null;
   reason: Reason | null;
   medication: MedicationId | null;
   doseMg: number | null;
@@ -56,6 +62,7 @@ export type LogKind =
   | 'dose'
   | 'photo'
   | 'activity'
+  | 'strength'
   | 'sleep';
 
 export type LogEntry = {
@@ -65,6 +72,7 @@ export type LogEntry = {
   /**
    * weight: lb|kg · water: ml · meal: protein g · dose: mg
    * symptom: severity 1-5 (0 = checked in feeling fine) · activity: minutes · sleep: hours
+   * strength: session minutes
    */
   value: number;
   note?: string;
@@ -87,6 +95,10 @@ export const DEFAULT_STATE: AppState = {
     name: '',
     email: '',
     isAdmin: false,
+    birthYear: null,
+    sex: null,
+    heightCm: null,
+    bodyFatPct: null,
     reason: null,
     medication: null,
     doseMg: null,

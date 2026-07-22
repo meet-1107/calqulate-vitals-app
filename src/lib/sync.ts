@@ -23,6 +23,10 @@ type ProfileRow = {
   reason: string | null;
   medication: string | null;
   dose_mg: number | null;
+  birth_year: number | null;
+  sex: 'male' | 'female' | 'other' | null;
+  height_cm: number | null;
+  body_fat_pct: number | null;
   injection_day: number | null;
   injection_hour: number;
   start_weight: number | null;
@@ -56,6 +60,10 @@ function toProfileRow(userId: string, p: Profile) {
     reason: p.reason,
     medication: p.medication,
     dose_mg: p.doseMg,
+    birth_year: p.birthYear,
+    sex: p.sex,
+    height_cm: p.heightCm,
+    body_fat_pct: p.bodyFatPct,
     injection_day: p.injectionDay,
     injection_hour: p.injectionHour,
     start_weight: p.startWeight,
@@ -76,6 +84,10 @@ function fromProfileRow(row: ProfileRow): Partial<Profile> {
     reason: (row.reason as Reason | null) ?? null,
     medication: (row.medication as MedicationId | null) ?? null,
     doseMg: row.dose_mg,
+    birthYear: row.birth_year ?? null,
+    sex: row.sex ?? null,
+    heightCm: row.height_cm ?? null,
+    bodyFatPct: row.body_fat_pct ?? null,
     injectionDay: row.injection_day,
     injectionHour: row.injection_hour,
     startWeight: row.start_weight,

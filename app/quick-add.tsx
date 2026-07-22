@@ -40,6 +40,7 @@ const ACCENT: Record<Kind, { tint: string; soft: string }> = {
   dose: { tint: '#8B5CF6', soft: '#F1EBFD' },
   symptom: { tint: '#E85C7A', soft: '#FDEBEF' },
   activity: { tint: '#0F9F73', soft: '#E9F7F1' },
+  strength: { tint: '#C2410C', soft: '#FDEDE3' },
   sleep: { tint: '#6366F1', soft: '#EDEEFC' },
   photo: { tint: '#0D9DA3', soft: '#E6F6F7' },
 };
@@ -51,6 +52,7 @@ const MENU: { id: Kind; title: string; sub: string; icon: keyof typeof Ionicons.
   { id: 'dose', title: 'Dose', sub: 'Medication dose', icon: 'medkit-outline' },
   { id: 'symptom', title: 'Symptoms', sub: 'How are you feeling?', icon: 'pulse-outline' },
   { id: 'activity', title: 'Activity', sub: 'Log your activity', icon: 'walk-outline' },
+  { id: 'strength', title: 'Strength', sub: 'Resistance training', icon: 'barbell-outline' },
   { id: 'sleep', title: 'Sleep', sub: 'Track your sleep', icon: 'moon-outline' },
   { id: 'photo', title: 'Photo', sub: 'Progress photo', icon: 'camera-outline' },
 ];
@@ -861,6 +863,57 @@ function QuickAddInner() {
                 label="Save Activity"
                 disabled={minutes == null}
                 onPress={() => save('activity', minutes ?? 0, { label: activityName.trim() || 'Activity' })}
+              />
+            </Animated.View>
+          ) : null}
+
+          {/* STRENGTH — tracked apart from cardio because resistance work is
+              the single strongest lever on muscle preservation. */}
+          {view === 'strength' ? (
+            <Animated.View entering={FadeInDown.duration(200)} style={{ gap: spacing.xl }}>
+              <HeroCard
+                kind="strength"
+                title="Log resistance training"
+                caption="The strongest protection against muscle loss"
+              />
+
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                {ACTIVITY_PRESETS.map((min) => (
+                  <Pressable
+                    key={min}
+                    onPress={() => setMinutes(min)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: spacing.lg,
+                      alignItems: 'center',
+                      borderRadius: radius.md,
+                      backgroundColor: minutes === min ? ACCENT.strength.soft : c.cardAlt,
+                      borderWidth: 1.5,
+                      borderColor: minutes === min ? ACCENT.strength.tint : 'transparent',
+                    }}
+                  >
+                    <Text variant="bodyStrong">{min}</Text>
+                    <Text variant="micro" tone="tertiary">
+                      MIN
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Field
+                label="Session"
+                value={activityName}
+                onChangeText={setActivityName}
+                placeholder="Full body, upper, legs…"
+              />
+
+              <SaveButton
+                kind="strength"
+                label="Save Session"
+                disabled={minutes == null}
+                onPress={() =>
+                  save('strength', minutes ?? 0, { label: activityName.trim() || 'Resistance training' })
+                }
               />
             </Animated.View>
           ) : null}
