@@ -23,9 +23,26 @@
  * every entry point degrades to a no-op.
  */
 
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import type * as ExpoNotifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { DAY_LABELS } from './dates';
+
+/**
+ * Expo Go on Android cannot load expo-notifications at all.
+ *
+ * The package ships a side-effect module, DevicePushTokenAutoRegistration.fx,
+ * which calls addPushTokenListener during import; on Android in Expo Go that
+ * throws, and because the throw happens inside a promise callback during module
+ * evaluation it escapes a try/catch around the dynamic import entirely — it
+ * surfaces as an uncaught error and takes the screen down.
+ *
+ * So the module is never imported there. Detecting the environment first is the
+ * only reliable guard; catching afterwards is too late.
+ */
+const IS_EXPO_GO_ANDROID =
+  Platform.OS === 'android' &&
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export const REMINDER_IDS = {
   injection: 'reminder.injection',
@@ -44,6 +61,10 @@ let handlerSet = false;
 async function load(): Promise<Module | null> {
   if (cached) return cached;
   if (unavailable) return null;
+  if (IS_EXPO_GO_ANDROID) {
+    unavailable = true;
+    return null;
+  }
 
   try {
     const mod = (await import('expo-notifications')) as Module;

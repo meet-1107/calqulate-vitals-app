@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Card, SectionTitle } from '../../src/components/Card';
 import { Meter, Ring, StackedBar } from '../../src/components/charts';
 import { CoachCard } from '../../src/components/CoachCard';
+import { LogoLockup } from '../../src/components/Logo';
 import { TodayBriefing } from '../../src/components/TodayBriefing';
 import { PKChart } from '../../src/components/PKChart';
 import { ProGate } from '../../src/components/Pro';
@@ -236,20 +237,17 @@ export default function Home() {
 
   return (
     <Screen scroll>
-      {/* One header row instead of four stacked blocks.
-          The avatar carries identity and the route to Profile, the greeting is
-          context, and the coach's verdict is the message. The logo lives on the
-          splash — a dashboard does not need to tell you which app you are in,
-          and it was costing a whole row above the fold. */}
+      {/* Brand row, then the message. */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: spacing.md,
+          justifyContent: 'space-between',
           marginTop: spacing.sm,
-          marginBottom: spacing.lg,
+          marginBottom: spacing.md,
         }}
       >
+        <LogoLockup size={28} />
         <Pressable
           onPress={() => router.push('/(tabs)/profile')}
           hitSlop={10}
@@ -258,8 +256,8 @@ export default function Home() {
         >
           <View
             style={{
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               borderRadius: radius.pill,
               alignItems: 'center',
               justifyContent: 'center',
@@ -271,16 +269,16 @@ export default function Home() {
             </Text>
           </View>
         </Pressable>
+      </View>
 
-        <View style={{ flex: 1 }}>
-          <Text variant="caption" tone="secondary">
-            {greeting()}, {profile.name || 'there'}
-          </Text>
-          {/* Title, not hero: at 40px the verdict swallowed the fold. */}
-          <Text variant="title" numberOfLines={2} style={{ marginTop: 1 }}>
-            {coach.headline}
-          </Text>
-        </View>
+      <View style={{ marginBottom: spacing.lg }}>
+        <Text variant="caption" tone="secondary">
+          {greeting()}, {profile.name || 'there'}
+        </Text>
+        {/* Title, not hero: at 40px the verdict swallowed the fold. */}
+        <Text variant="title" style={{ marginTop: 1 }}>
+          {coach.headline}
+        </Text>
       </View>
 
       <View style={{ marginBottom: spacing.lg }}>

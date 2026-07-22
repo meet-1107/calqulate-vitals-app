@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from './Text';
-import { Meter } from './charts';
+import { Ring } from './charts';
 import { useColors, useTheme } from '../theme/ThemeProvider';
 import { litres, type Level, type TodayBrief } from '../lib/today';
 import { radius, spacing } from '../theme';
@@ -23,36 +23,33 @@ function levelTone(level: Level, invert = false) {
   return { good, bad };
 }
 
-function Item({
-  icon,
-  label,
-  value,
-  caption,
-  tint,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  caption?: string;
-  tint?: string;
-}) {
-  const c = useColors();
+/**
+ * One stat in the row.
+ *
+ * Short label, value, nothing else. The previous version carried an icon and an
+ * explanatory caption per cell, which collided with its neighbour, truncated,
+ * and left the grid ragged. The explanation belongs in the sentence below the
+ * row, not in six competing footnotes.
+ */
+/** One line describing where in the dose cycle this level sits. */
+const PHASE_CAPTION: Record<TodayBrief['phase'], string> = {
+  rising: 'Rising after your dose',
+  peak: 'Peak coverage',
+  declining: 'Easing off mid-cycle',
+  trough: 'Low before your next dose',
+  overdue: 'Dose overdue',
+  none: 'Log a dose to start the curve',
+};
+
+function Stat({ label, value, tint }: { label: string; value: string; tint?: string }) {
   return (
-    <View style={{ flex: 1, minWidth: '44%', gap: 3 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Ionicons name={icon} size={13} color={c.textTertiary} />
-        <Text variant="micro" tone="tertiary">
-          {label}
-        </Text>
-      </View>
-      <Text variant="bodyStrong" style={tint ? { color: tint } : undefined}>
+    <View style={{ flex: 1, gap: 3 }}>
+      <Text variant="micro" tone="tertiary" numberOfLines={1}>
+        {label}
+      </Text>
+      <Text variant="bodyStrong" style={tint ? { color: tint } : undefined} numberOfLines={1}>
         {value}
       </Text>
-      {caption ? (
-        <Text variant="micro" tone="tertiary" numberOfLines={2}>
-          {caption}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -87,67 +84,52 @@ export function TodayBriefing({ brief }: { brief: TodayBrief }) {
         </Text>
       </View>
 
-      {/* GLP-1 activity leads: it is what makes every other number make sense. */}
-      <View>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <Text variant="body" tone="secondary">
-            GLP-1 activity
+      {/* GLP-1 activity leads: it is what makes every other number make sense.
+          A ring rather than a bar — it reads as a level at a glance and matches
+          the score and confidence rings used elsewhere. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+        <Ring percent={brief.activity} size={96} stroke={10} label={`${brief.activity}%`} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="bodyStrong">GLP-1 activity</Text>
+          <Text variant="caption" tone="secondary">
+            {PHASE_CAPTION[brief.phase]}
           </Text>
-          <Text variant="title" tone="primary">
-            {brief.activity}%
-          </Text>
-        </View>
-        <View style={{ marginTop: spacing.sm }}>
-          <Meter percent={brief.activity} />
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg, columnGap: spacing.md }}>
-        <Item
-          icon="restaurant-outline"
-          label="EXPECTED HUNGER"
+      {/* Four stats, one row, equal widths. The Metabolic Score is deliberately
+          absent: the very next card on Home is the score, and showing it twice
+          made this card look busy while saying nothing new. */}
+      <View style={{ height: 1, backgroundColor: c.border }} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <Stat
+          label="HUNGER"
           value={brief.hunger}
           tint={hunger.good ? c.primary : hunger.bad ? c.pro : undefined}
         />
-        <Item
-          icon="flash-outline"
-          label="EXPECTED ENERGY"
+        <Stat
+          label="ENERGY"
           value={brief.energy}
           tint={energy.good ? c.primary : energy.bad ? c.pro : undefined}
         />
-        <Item
-          icon="nutrition-outline"
-          label="RECOMMENDED PROTEIN"
-          value={`${brief.proteinTarget} g`}
-          caption={brief.proteinBasis}
-        />
-        <Item
-          icon="water-outline"
-          label="HYDRATION GOAL"
-          value={litres(brief.hydrationTarget)}
-          caption="From your body weight"
-        />
-        {brief.workout ? (
-          <Item
-            icon="barbell-outline"
-            label="WORKOUT WINDOW"
-            value={brief.workout.window}
-            caption={brief.workout.basis}
-          />
-        ) : null}
-        <Item
-          icon="sparkles-outline"
-          label="METABOLIC SCORE"
-          value={String(brief.score.total)}
-          caption={brief.score.band}
-          tint={c.primary}
-        />
+        <Stat label="PROTEIN" value={`${brief.proteinTarget} g`} />
+        <Stat label="WATER" value={litres(brief.hydrationTarget)} />
       </View>
+      <View style={{ height: 1, backgroundColor: c.border }} />
 
       {brief.headline ? (
         <Text variant="caption" tone="secondary">
           {brief.headline}
         </Text>
+      ) : null}
+
+      {brief.workout ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Ionicons name="barbell-outline" size={13} color={c.textTertiary} />
+          <Text variant="micro" tone="tertiary">
+            Best window to train: {brief.workout.window} · {brief.workout.basis.toLowerCase()}
+          </Text>
+        </View>
       ) : null}
 
       {brief.score.available > 0 ? (
