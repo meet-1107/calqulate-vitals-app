@@ -22,6 +22,7 @@ export function useNotificationSync() {
       injectionHour: profile.injectionHour,
       reminderHour,
       medicationName: getMedication(profile.medication).name,
+      route: getMedication(profile.medication).route,
       proteinGoal: profile.goals.proteinG,
     }).catch(() => {});
   }, [

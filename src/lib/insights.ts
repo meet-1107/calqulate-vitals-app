@@ -43,7 +43,15 @@ export function computeToday(profile: Profile, logs: LogEntry[], now = Date.now(
     weightDelta: latest && previous ? latest.value - previous.value : null,
     waterMl,
     proteinG,
-    medicationLevel: levelPercent(doses, now, med.halfLifeHours, profile.doseMg ?? 0),
+    // The medication's own cadence, not an assumed week: a daily pill judged
+    // against a weekly steady-state peak would read far too low.
+    medicationLevel: levelPercent(
+      doses,
+      now,
+      med.halfLifeHours,
+      profile.doseMg ?? 0,
+      med.intervalHours,
+    ),
     nextInjection: nextInjection(profile.injectionDay, profile.injectionHour, now),
     hydrationPct: Math.min(100, Math.round((waterMl / profile.goals.waterMl) * 100)),
     proteinPct: Math.min(100, Math.round((proteinG / profile.goals.proteinG) * 100)),
@@ -138,7 +146,7 @@ export function todayForecast(profile: Profile, logs: LogEntry[], now = Date.now
     };
   }
 
-  const intervalH = 168; // weekly cadence
+  const intervalH = getMedication(profile.medication).intervalHours;
   const f = (now - lastDose.at) / (intervalH * 3600_000);
   const pct = computeToday(profile, logs, now).medicationLevel;
 

@@ -13,7 +13,7 @@
 
 import { supabase } from './supabase';
 import type { LogEntry, Profile } from '../store/types';
-import type { MedicationId } from './medications';
+import { getMedication, type MedicationId } from './medications';
 import type { Reason, Units } from '../store/types';
 
 type ProfileRow = {
@@ -48,6 +48,7 @@ type LogRow = {
   value: number;
   label: string | null;
   note: string | null;
+  site: string | null;
   logged_at: string;
 };
 
@@ -60,6 +61,8 @@ function toProfileRow(userId: string, p: Profile) {
     reason: p.reason,
     medication: p.medication,
     dose_mg: p.doseMg,
+    medication_route: getMedication(p.medication).route,
+    dose_interval_hours: getMedication(p.medication).intervalHours,
     birth_year: p.birthYear,
     sex: p.sex,
     height_cm: p.heightCm,
@@ -111,6 +114,7 @@ const toLogEntry = (row: LogRow): LogEntry => ({
   value: Number(row.value),
   label: row.label ?? undefined,
   note: row.note ?? undefined,
+  site: row.site ?? undefined,
   at: new Date(row.logged_at).getTime(),
 });
 
@@ -130,6 +134,7 @@ export async function pushLog(userId: string, entry: LogEntry) {
       value: entry.value,
       label: entry.label ?? null,
       note: entry.note ?? null,
+      site: entry.site ?? null,
       logged_at: new Date(entry.at).toISOString(),
     })
     .then(undefined, () => {});
@@ -229,6 +234,7 @@ export async function pushAll(userId: string, profile: Profile, logs: LogEntry[]
         value: entry.value,
         label: entry.label ?? null,
         note: entry.note ?? null,
+        site: entry.site ?? null,
         logged_at: new Date(entry.at).toISOString(),
       })),
     )

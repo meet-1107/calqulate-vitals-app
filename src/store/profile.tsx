@@ -21,7 +21,11 @@ type Ctx = {
   trash: LogEntry[];
   syncing: boolean;
   patchProfile: (patch: Partial<Profile>) => void;
-  addLog: (kind: LogKind, value: number, extra?: { label?: string; note?: string; at?: number }) => void;
+  addLog: (
+    kind: LogKind,
+    value: number,
+    extra?: { label?: string; note?: string; at?: number; site?: string },
+  ) => void;
   removeLog: (id: string) => void;
   undoDelete: () => void;
   /** Pulls this account's data down, merges it with whatever is local, pushes back. */
@@ -100,6 +104,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         at: extra?.at ?? Date.now(),
         label: extra?.label,
         note: extra?.note,
+        site: extra?.site,
       };
       if (s.profile.userId) void pushLog(s.profile.userId, entry);
       return { ...s, logs: [entry, ...s.logs] };

@@ -40,12 +40,18 @@ export default function MedicationTab() {
 
   const curve = useMemo(() => {
     const doses = doseLogs.map((l) => ({ takenAt: l.at, amountMg: l.value }));
-    return levelSeries(doses, now, med.halfLifeHours, profile.doseMg ?? 0);
+    return levelSeries(doses, now, med.halfLifeHours, profile.doseMg ?? 0, {
+      intervalHours: med.intervalHours,
+    });
   }, [doseLogs, med.halfLifeHours, profile.doseMg, now]);
 
   const miniCurve = useMemo(() => {
     const doses = doseLogs.map((l) => ({ takenAt: l.at, amountMg: l.value }));
-    return levelSeries(doses, now, med.halfLifeHours, profile.doseMg ?? 0, { back: 4, forward: 7 });
+    return levelSeries(doses, now, med.halfLifeHours, profile.doseMg ?? 0, {
+      back: 4,
+      forward: 7,
+      intervalHours: med.intervalHours,
+    });
   }, [doseLogs, med.halfLifeHours, profile.doseMg, now]);
 
   const peakLabel = useMemo(() => {

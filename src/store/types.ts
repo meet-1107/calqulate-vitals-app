@@ -80,6 +80,8 @@ export type LogEntry = {
   note?: string;
   /** symptom name, meal name, photo uri */
   label?: string;
+  /** Injection site id, for dose entries on an injectable. */
+  site?: string;
 };
 
 export type AppState = {

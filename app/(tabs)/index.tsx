@@ -208,7 +208,11 @@ export default function Home() {
   const doseLogs = useMemo(() => logs.filter((l) => l.kind === 'dose'), [logs]);
   const curve = useMemo(() => {
     const doses = doseLogs.map((l) => ({ takenAt: l.at, amountMg: l.value }));
-    return levelSeries(doses, now, med.halfLifeHours, profile.doseMg ?? 0, { back: 7, forward: 7 });
+    return levelSeries(doses, now, med.halfLifeHours, profile.doseMg ?? 0, {
+      back: 7,
+      forward: 7,
+      intervalHours: med.intervalHours,
+    });
   }, [doseLogs, med.halfLifeHours, profile.doseMg, now]);
 
   const peakLabel = useMemo(() => {

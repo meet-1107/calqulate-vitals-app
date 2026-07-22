@@ -138,6 +138,8 @@ type ReminderConfig = {
   reminderHour: number;
   medicationName: string;
   proteinGoal: number;
+  /** Injectables remind on their day; pills remind every day. */
+  route: 'injection' | 'oral';
 };
 
 /**
@@ -186,7 +188,20 @@ export async function syncReminders(config: ReminderConfig) {
       { type: mod.SchedulableTriggerInputTypes.DAILY, hour: 14, minute: 0 },
     );
 
-    if (config.injectionDay != null) {
+    // A daily pill and a weekly shot need different reminders. Reminding an
+    // oral user once a week would miss six doses out of seven.
+    if (config.route === 'oral') {
+      await schedule(
+        REMINDER_IDS.injection,
+        `Time for your ${config.medicationName}`,
+        'Empty stomach, small sip of water, then wait 30 minutes before eating.',
+        {
+          type: mod.SchedulableTriggerInputTypes.DAILY,
+          hour: config.injectionHour,
+          minute: 0,
+        },
+      );
+    } else if (config.injectionDay != null) {
       await schedule(
         REMINDER_IDS.injection,
         'Today is your injection day',

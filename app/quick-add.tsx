@@ -68,7 +68,9 @@ const SLEEP_SCALE = range(3, 12, 0.5);
 
 const MOODS = ['😄', '🙂', '😐', '🙁', '😣'] as const;
 const SYMPTOMS = ['Nausea', 'Fatigue', 'Headache', 'Constipation', 'Diarrhea', 'Bloating', 'Heartburn', 'Injection site'];
-const SITES = ['Abdomen', 'Thigh', 'Arm'] as const;
+// Structured sites live in the library so rotation, warnings and the
+// medication screen all read from one list.
+import { SITES as INJECTION_SITES, nextSite, type SiteId } from '../src/lib/injectionSites';
 const WATER_CHIPS = [250, 500, 750, 1000];
 const ACTIVITY_PRESETS = [15, 30, 45, 60];
 
@@ -257,7 +259,9 @@ function QuickAddInner() {
 
   // Dose state
   const [dose, setDose] = useState(profile.doseMg ?? med.doses[0]);
-  const [site, setSite] = useState<(typeof SITES)[number]>('Abdomen');
+  // Opens on the next site in the rotation rather than always the same one.
+  const suggested = useMemo(() => nextSite(logs), [logs]);
+  const [site, setSite] = useState<SiteId>(suggested.id);
 
   // Symptoms state
   const [feelingFine, setFeelingFine] = useState(false);
@@ -272,7 +276,11 @@ function QuickAddInner() {
   const [sleepH, setSleepH] = useState(7.5);
 
   const close = () => router.back();
-  const save = (kind: Kind, value: number, extra?: { label?: string; note?: string }) => {
+  const save = (
+    kind: Kind,
+    value: number,
+    extra?: { label?: string; note?: string; site?: string },
+  ) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     addLog(kind, value, extra);
     close();
@@ -664,48 +672,96 @@ function QuickAddInner() {
                 ))}
               </View>
 
-              <View>
-                <Text variant="caption" tone="secondary" style={{ marginBottom: spacing.sm }}>
-                  Injection site
-                </Text>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  {SITES.map((s) => (
-                    <Pressable
-                      key={s}
-                      onPress={() => setSite(s)}
-                      style={{
-                        flex: 1,
-                        alignItems: 'center',
-                        gap: spacing.sm,
-                        padding: spacing.lg,
-                        borderRadius: radius.lg,
-                        backgroundColor: site === s ? ACCENT.dose.soft : c.cardAlt,
-                        borderWidth: 1.5,
-                        borderColor: site === s ? ACCENT.dose.tint : 'transparent',
-                      }}
-                    >
-                      <Ionicons
-                        name="body-outline"
-                        size={20}
-                        color={site === s ? ACCENT.dose.tint : c.textTertiary}
-                      />
-                      <Text
-                        variant="caption"
-                        style={{ color: site === s ? ACCENT.dose.tint : c.textSecondary }}
-                      >
-                        {s}
-                      </Text>
-                    </Pressable>
-                  ))}
+              {/* Injection sites only matter for injectables. An oral gets the
+                  guidance that actually affects absorption instead. */}
+              {med.route === 'injection' ? (
+                <View>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: spacing.sm,
+                    }}
+                  >
+                    <Text variant="caption" tone="secondary">
+                      Injection site
+                    </Text>
+                    <Text variant="micro" tone="tertiary">
+                      Suggested: {suggested.label}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                    {INJECTION_SITES.map((s) => {
+                      const active = site === s.id;
+                      return (
+                        <Pressable
+                          key={s.id}
+                          onPress={() => setSite(s.id)}
+                          style={{
+                            width: '31%',
+                            alignItems: 'center',
+                            gap: 6,
+                            paddingVertical: spacing.md,
+                            borderRadius: radius.lg,
+                            backgroundColor: active ? ACCENT.dose.soft : c.cardAlt,
+                            borderWidth: 1.5,
+                            borderColor: active
+                              ? ACCENT.dose.tint
+                              : s.id === suggested.id
+                                ? ACCENT.dose.soft
+                                : 'transparent',
+                          }}
+                        >
+                          <Ionicons
+                            name="body-outline"
+                            size={18}
+                            color={active ? ACCENT.dose.tint : c.textTertiary}
+                          />
+                          <Text
+                            variant="micro"
+                            style={{
+                              color: active ? ACCENT.dose.tint : c.textSecondary,
+                              textAlign: 'center',
+                            }}
+                          >
+                            {s.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: spacing.md,
+                    padding: spacing.lg,
+                    borderRadius: radius.lg,
+                    backgroundColor: ACCENT.dose.soft,
+                  }}
+                >
+                  <Ionicons name="information-circle" size={18} color={ACCENT.dose.tint} />
+                  <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
+                    Take on an empty stomach with a small sip of water, then wait at least 30
+                    minutes before eating, drinking or other medication — food sharply reduces how
+                    much oral semaglutide is absorbed.
+                  </Text>
+                </View>
+              )}
 
               <TimeRow />
 
               <SaveButton
                 kind="dose"
                 label="Save Dose"
-                onPress={() => save('dose', dose, { label: `${med.name} · ${site}` })}
+                onPress={() =>
+                  save('dose', dose, {
+                    label: med.name,
+                    site: med.route === 'injection' ? site : undefined,
+                  })
+                }
               />
             </Animated.View>
           ) : null}
