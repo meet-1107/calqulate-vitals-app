@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Card, SectionTitle } from '../../src/components/Card';
 import { Meter, Ring, StackedBar } from '../../src/components/charts';
 import { CoachCard } from '../../src/components/CoachCard';
+import { MedicationHero, OutlookRow } from '../../src/components/MedicationHero';
 import { LogoLockup } from '../../src/components/Logo';
 import { TodayBriefing } from '../../src/components/TodayBriefing';
 import { PKChart } from '../../src/components/PKChart';
@@ -16,6 +17,7 @@ import { Text } from '../../src/components/Text';
 import { WeightChart, WeightStats } from '../../src/components/WeightChart';
 import { avgWeeklyLoss, coachInsight } from '../../src/lib/coach';
 import { todayBrief } from '../../src/lib/today';
+import { medicationCycle, outlookFor } from '../../src/lib/cycle';
 import { dayIndex, nextUnlock, unlockedToday } from '../../src/lib/journey';
 import { buildIntelligence } from '../../src/lib/intelligence';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
@@ -165,6 +167,10 @@ export default function Home() {
 
   const brief = useMemo(() => todayBrief(profile, logs, now), [profile, logs, now]);
 
+  // Medication is the foundation: where in the cycle, and did I take it.
+  const cycle = useMemo(() => medicationCycle(profile, logs, at), [profile, logs, at]);
+  const outlook = outlookFor(cycle);
+
   // Progressive reveal: something new most days of the first fortnight, so
   // there is a reason to return that is not a reminder to log.
   const day = useMemo(() => dayIndex(logs, now), [logs, now]);
@@ -285,7 +291,26 @@ export default function Home() {
         <ModeSwitch value={mode} onChange={setMode} />
       </View>
 
-      {/* The daily briefing leads: it has value before anything is logged. */}
+      {/* Medication first. It is the job the app was hired to do, it works from
+          a single logged dose, and everything below is downstream of it. */}
+      <View style={{ marginBottom: spacing.lg }}>
+        <MedicationHero cycle={cycle} />
+      </View>
+
+      {/* What today should feel like, straight off the cycle position. */}
+      {mode === 'today' ? (
+        <Card style={{ marginBottom: spacing.lg, gap: spacing.md }}>
+          <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
+            Today&apos;s outlook
+          </Text>
+          <OutlookRow outlook={outlook} />
+          <Text variant="caption" tone="secondary">
+            {outlook.note}
+          </Text>
+        </Card>
+      ) : null}
+
+      {/* Then the daily targets. */}
       {mode === 'today' ? (
         <View style={{ marginBottom: spacing.lg }}>
           <TodayBriefing brief={brief} />

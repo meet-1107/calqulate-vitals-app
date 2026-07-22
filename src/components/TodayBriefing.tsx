@@ -77,51 +77,21 @@ export function TodayBriefing({ brief }: { brief: TodayBrief }) {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
-          Today
+          Today&apos;s targets
         </Text>
         <Text variant="micro" tone="tertiary">
           {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
         </Text>
       </View>
 
-      {/* GLP-1 activity leads: it is what makes every other number make sense.
-          A ring rather than a bar — it reads as a level at a glance and matches
-          the score and confidence rings used elsewhere. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-        <Ring percent={brief.activity} size={96} stroke={10} label={`${brief.activity}%`} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="bodyStrong">GLP-1 activity</Text>
-          <Text variant="caption" tone="secondary">
-            {PHASE_CAPTION[brief.phase]}
-          </Text>
-        </View>
-      </View>
-
-      {/* Four stats, one row, equal widths. The Metabolic Score is deliberately
-          absent: the very next card on Home is the score, and showing it twice
-          made this card look busy while saying nothing new. */}
-      <View style={{ height: 1, backgroundColor: c.border }} />
+      {/* Targets only. The activity ring lives in the medication hero and
+          hunger/energy in the outlook row — repeating them here made three
+          cards say the same thing. */}
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <Stat
-          label="HUNGER"
-          value={brief.hunger}
-          tint={hunger.good ? c.primary : hunger.bad ? c.pro : undefined}
-        />
-        <Stat
-          label="ENERGY"
-          value={brief.energy}
-          tint={energy.good ? c.primary : energy.bad ? c.pro : undefined}
-        />
         <Stat label="PROTEIN" value={`${brief.proteinTarget} g`} />
         <Stat label="WATER" value={litres(brief.hydrationTarget)} />
+        <Stat label="SCORE" value={String(brief.score.total)} tint={c.primary} />
       </View>
-      <View style={{ height: 1, backgroundColor: c.border }} />
-
-      {brief.headline ? (
-        <Text variant="caption" tone="secondary">
-          {brief.headline}
-        </Text>
-      ) : null}
 
       {brief.workout ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

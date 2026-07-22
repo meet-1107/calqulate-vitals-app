@@ -8,12 +8,21 @@ import { LineChart, Meter } from '../../src/components/charts';
 import { PKChart } from '../../src/components/PKChart';
 import { ProBlur } from '../../src/components/ProBlur';
 import { ProGate } from '../../src/components/Pro';
+import { MedicationHero } from '../../src/components/MedicationHero';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { computeSweetSpot } from '../../src/lib/dosing';
 import { computeToday } from '../../src/lib/insights';
 import { getMedication } from '../../src/lib/medications';
 import { levelSeries } from '../../src/lib/pk';
+import { medicationCycle } from '../../src/lib/cycle';
+import {
+  SITES,
+  nextSite,
+  rotationCoverage,
+  rotationWarnings,
+  siteHistory,
+} from '../../src/lib/injectionSites';
 import { useProfile } from '../../src/store/profile';
 import { useColors, useTheme } from '../../src/theme/ThemeProvider';
 import { palette, radius, spacing } from '../../src/theme';
@@ -31,6 +40,18 @@ export default function MedicationTab() {
 
   const med = getMedication(profile.medication);
   const now = Date.now();
+
+  const cycle = useMemo(() => medicationCycle(profile, logs, now), [profile, logs, now]);
+  const rotation = useMemo(
+    () => ({
+      next: nextSite(logs),
+      coverage: rotationCoverage(logs, now),
+      warnings: rotationWarnings(logs, now),
+      recent: siteHistory(logs).filter((h) => h.at >= now - 30 * 86_400_000),
+    }),
+    [logs, now],
+  );
+
   const today = useMemo(() => computeToday(profile, logs), [profile, logs]);
   const doseLogs = useMemo(
     () => logs.filter((l) => l.kind === 'dose').sort((a, b) => b.at - a.at),
@@ -89,6 +110,80 @@ export default function MedicationTab() {
       <Text variant="caption" tone="secondary" style={{ marginTop: 2, marginBottom: spacing.lg }}>
         Stay on track with your treatment
       </Text>
+
+      {/* Cycle, activity and the log action — the same hero as Home, so the
+          answer to "where am I" is identical wherever it is asked. */}
+      <MedicationHero cycle={cycle} />
+
+      {/* Adherence and rotation: the two things a tracker must get right. */}
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg }}>
+        <Card style={{ flex: 1, gap: 4 }}>
+          <Text variant="micro" tone="tertiary">
+            ADHERENCE
+          </Text>
+          <Text variant="heading" tone="primary">
+            {cycle.adherence.percent}%
+          </Text>
+          <Text variant="micro" tone="tertiary">
+            {cycle.adherence.taken} of {cycle.adherence.expected} recent doses
+          </Text>
+        </Card>
+        {cycle.route === 'injection' ? (
+          <Card style={{ flex: 1, gap: 4 }}>
+            <Text variant="micro" tone="tertiary">
+              SITE ROTATION
+            </Text>
+            <Text variant="heading" tone={rotation.warnings.length ? 'pro' : 'primary'}>
+              {rotation.coverage}/{SITES.length}
+            </Text>
+            <Text variant="micro" tone="tertiary">
+              sites used this month
+            </Text>
+          </Card>
+        ) : null}
+      </View>
+
+      {cycle.route === 'injection' ? (
+        <>
+          <SectionTitle>Injection sites</SectionTitle>
+          <Card style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {SITES.map((site) => {
+                const used = rotation.recent.filter((h) => h.site === site.id).length;
+                const isNext = site.id === rotation.next.id;
+                return (
+                  <View
+                    key={site.id}
+                    style={{
+                      width: '31%',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingVertical: spacing.md,
+                      borderRadius: radius.lg,
+                      backgroundColor: isNext ? c.primarySoft : c.bgElevated,
+                      borderWidth: 1.5,
+                      borderColor: isNext ? c.primary : 'transparent',
+                    }}
+                  >
+                    <Text variant="micro" tone={isNext ? 'primary' : 'tertiary'} style={{ textAlign: 'center' }}>
+                      {site.label}
+                    </Text>
+                    <Text variant="caption" tone={used >= 3 ? 'pro' : 'secondary'}>
+                      {used === 0 ? '—' : `${used}×`}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+            <Text variant="caption" tone="secondary">
+              Next up: {rotation.next.label}.
+              {rotation.warnings.length
+                ? ` ${rotation.warnings[0].label} has taken ${rotation.warnings[0].times} doses this month — repeated injections in one spot absorb unevenly.`
+                : ' Rotating keeps absorption even.'}
+            </Text>
+          </Card>
+        </>
+      ) : null}
 
       {/* NEXT DOSE hero */}
       <LinearGradient
