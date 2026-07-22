@@ -6,19 +6,24 @@
  *  - **Remote (Firebase Cloud Messaging)** — anything the backend decides:
  *    campaign sends from the admin panel, weekly insight pushes, subscription
  *    notices. Android goes through FCM natively; iOS goes through APNs with FCM
- *    as the sender. We register for a native device token and hand it to the
- *    backend, which stores it in `devices`.
+ *    as the sender.
  *
  *  - **Local** — dose day, weigh-in, and hydration reminders. These are pure
  *    functions of data already on the device, so scheduling them locally means
  *    they fire correctly with no network and no server cost.
  *
- * Requires a development build. Remote push does not work in Expo Go — the
- * registration call below returns null there rather than throwing.
+ * EVERYTHING HERE IS LAZY AND DEFENSIVE.
+ *
+ * `expo-notifications` throws on Android in Expo Go — remote push was removed
+ * from it in SDK 53. An earlier version of this file imported the module at the
+ * top and called `setNotificationHandler` at module scope, so that throw
+ * propagated into every route that imported it and the entire app rendered a
+ * blank screen. A notification helper must never be able to take down the app
+ * it is decorating, so the module is imported on demand inside try/catch and
+ * every entry point degrades to a no-op.
  */
 
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import type * as ExpoNotifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { DAY_LABELS } from './dates';
 
@@ -29,45 +34,97 @@ export const REMINDER_IDS = {
   morning: 'reminder.morning',
 } as const;
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+type Module = typeof ExpoNotifications;
 
-async function ensureAndroidChannel() {
+let cached: Module | null = null;
+let unavailable = false;
+let handlerSet = false;
+
+/** Resolves the native module, or null where it cannot run. */
+async function load(): Promise<Module | null> {
+  if (cached) return cached;
+  if (unavailable) return null;
+
+  try {
+    const mod = (await import('expo-notifications')) as Module;
+    cached = mod;
+    ensureHandler(mod);
+    return mod;
+  } catch {
+    // Expo Go on Android, or a build without the module. Not an error state.
+    unavailable = true;
+    return null;
+  }
+}
+
+/** Sets the foreground presentation rule once, never at import time. */
+function ensureHandler(mod: Module) {
+  if (handlerSet) return;
+  try {
+    mod.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+    handlerSet = true;
+  } catch {
+    /* presentation rules are cosmetic — never worth a crash */
+  }
+}
+
+/** True when notifications can actually work on this build. */
+export async function isAvailable() {
+  return (await load()) !== null;
+}
+
+async function ensureAndroidChannel(mod: Module) {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('reminders', {
-    name: 'Reminders',
-    importance: Notifications.AndroidImportance.DEFAULT,
-    vibrationPattern: [0, 200, 100, 200],
-    lightColor: '#0F9F73',
-  });
+  try {
+    await mod.setNotificationChannelAsync('reminders', {
+      name: 'Reminders',
+      importance: mod.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 200, 100, 200],
+      lightColor: '#0F9F73',
+    });
+  } catch {
+    /* channel creation is best effort */
+  }
 }
 
 export async function requestPermission(): Promise<boolean> {
-  const existing = await Notifications.getPermissionsAsync();
-  if (existing.granted) return true;
-  if (!existing.canAskAgain) return false;
-  const asked = await Notifications.requestPermissionsAsync();
-  return asked.granted;
+  const mod = await load();
+  if (!mod) return false;
+
+  try {
+    const existing = await mod.getPermissionsAsync();
+    if (existing.granted) return true;
+    if (!existing.canAskAgain) return false;
+    const asked = await mod.requestPermissionsAsync();
+    return asked.granted;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Registers this device with FCM/APNs and returns the token to send to the
- * backend. Returns null in Expo Go, on simulators, or without permission —
- * all expected, none of them errors.
+ * backend. Returns null in Expo Go, on simulators, or without permission — all
+ * expected, none of them errors.
  */
 export async function registerForPush(): Promise<string | null> {
-  if (!Device.isDevice) return null;
-  if (!(await requestPermission())) return null;
-  await ensureAndroidChannel();
+  const mod = await load();
+  if (!mod) return null;
 
   try {
-    const { data } = await Notifications.getDevicePushTokenAsync();
+    const Device = await import('expo-device');
+    if (!Device.isDevice) return null;
+    if (!(await requestPermission())) return null;
+    await ensureAndroidChannel(mod);
+
+    const { data } = await mod.getDevicePushTokenAsync();
     return typeof data === 'string' ? data : null;
   } catch {
     return null;
@@ -89,63 +146,71 @@ type ReminderConfig = {
  * stacking duplicate notifications.
  */
 export async function syncReminders(config: ReminderConfig) {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  if (!config.enabled) return;
-  if (!(await requestPermission())) return;
-  await ensureAndroidChannel();
+  const mod = await load();
+  if (!mod) return;
 
-  const schedule = (
-    identifier: string,
-    title: string,
-    body: string,
-    trigger: Notifications.NotificationTriggerInput,
-  ) =>
-    Notifications.scheduleNotificationAsync({
-      identifier,
-      content: { title, body },
-      trigger,
-    });
+  try {
+    await mod.cancelAllScheduledNotificationsAsync();
+    if (!config.enabled) return;
+    if (!(await requestPermission())) return;
+    await ensureAndroidChannel(mod);
 
-  await schedule(
-    REMINDER_IDS.morning,
-    'Good morning 🌿',
-    `Today's protein goal is ${config.proteinGoal} g.`,
-    {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: config.reminderHour,
-      minute: 0,
-    },
-  );
+    const schedule = (
+      identifier: string,
+      title: string,
+      body: string,
+      trigger: ExpoNotifications.NotificationTriggerInput,
+    ) => mod.scheduleNotificationAsync({ identifier, content: { title, body }, trigger });
 
-  await schedule(REMINDER_IDS.weighIn, 'Ready for today’s weigh-in?', 'It takes ten seconds.', {
-    type: Notifications.SchedulableTriggerInputTypes.DAILY,
-    hour: Math.min(23, config.reminderHour + 1),
-    minute: 0,
-  });
-
-  await schedule(
-    REMINDER_IDS.hydration,
-    'Hydration check',
-    "You're halfway through the day — how's your water?",
-    { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 14, minute: 0 },
-  );
-
-  if (config.injectionDay != null) {
     await schedule(
-      REMINDER_IDS.injection,
-      'Today is your injection day',
-      `${config.medicationName} · ${DAY_LABELS[config.injectionDay]}`,
+      REMINDER_IDS.morning,
+      'Good morning 🌿',
+      `Today's protein goal is ${config.proteinGoal} g.`,
       {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-        // expo-notifications weekdays are 1-7 with Sunday = 1.
-        weekday: config.injectionDay + 1,
-        hour: config.injectionHour,
+        type: mod.SchedulableTriggerInputTypes.DAILY,
+        hour: config.reminderHour,
         minute: 0,
       },
     );
+
+    await schedule(REMINDER_IDS.weighIn, 'Ready for today’s weigh-in?', 'It takes ten seconds.', {
+      type: mod.SchedulableTriggerInputTypes.DAILY,
+      hour: Math.min(23, config.reminderHour + 1),
+      minute: 0,
+    });
+
+    await schedule(
+      REMINDER_IDS.hydration,
+      'Hydration check',
+      "You're halfway through the day — how's your water?",
+      { type: mod.SchedulableTriggerInputTypes.DAILY, hour: 14, minute: 0 },
+    );
+
+    if (config.injectionDay != null) {
+      await schedule(
+        REMINDER_IDS.injection,
+        'Today is your injection day',
+        `${config.medicationName} · ${DAY_LABELS[config.injectionDay]}`,
+        {
+          type: mod.SchedulableTriggerInputTypes.WEEKLY,
+          // expo-notifications weekdays are 1-7 with Sunday = 1.
+          weekday: config.injectionDay + 1,
+          hour: config.injectionHour,
+          minute: 0,
+        },
+      );
+    }
+  } catch {
+    /* a reminder that fails to schedule must not break the screen that asked */
   }
 }
 
 export async function cancelAllReminders() {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const mod = await load();
+  if (!mod) return;
+  try {
+    await mod.cancelAllScheduledNotificationsAsync();
+  } catch {
+    /* nothing to do */
+  }
 }
