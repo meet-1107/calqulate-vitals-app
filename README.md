@@ -167,6 +167,41 @@ Fat and muscle are split from the week's actual weight change by the model's
 lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
 until there is enough logged for the card to say anything true.
 
+## Tomorrow Simulator™
+
+[`src/lib/tomorrow.ts`](src/lib/tomorrow.ts) answers "what happens if…" instead
+of "here is what happened". It shows tomorrow's score if you coast, then what
+each choice would make it.
+
+**The numbers are exact, not estimated.** Each figure is the real
+`computeScore` run over hypothetical logs dated tomorrow, so a promised +20 is
+precisely what the user gets by doing it. This is verified — a simulator that
+mispredicts its own app is worse than none, because the user finds out. Choices
+stack, and the stack is re-scored rather than summed, since the score caps at
+100 and components saturate.
+
+## The habit loop
+
+[`src/lib/journey.ts`](src/lib/journey.ts) holds three things:
+
+**Progressive unlock.** The first fortnight reveals something new most days —
+score, trend, medication curve, coach, weekly report, body composition,
+simulator. Unlocks gate on *days elapsed*, not logging volume, so missing a day
+never costs ground that cannot be recovered. Home surfaces the day's reveal.
+
+**Metabolic Streak.** Consecutive days where the score beat the day before —
+chasing improvement rather than attendance. A logging streak only proves the
+user opened the app.
+
+**Accumulated history.** [`/journey`](app/journey.tsx) is the diary: day count,
+weigh-ins, doses, meals, photos, milestones, and what was actually lost. None of
+it is computed cleverly — it is a count of what the user did, which is precisely
+why it is worth keeping.
+
+Milestones are expressed physically, picking the *smallest* familiar object that
+still gives a comprehensible count: "48 sticks of butter" is a picture, "2 house
+bricks" is a shrug.
+
 ## Body Composition Engine™
 
 [`src/lib/composition.ts`](src/lib/composition.ts) estimates how a weight change

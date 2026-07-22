@@ -16,6 +16,7 @@ import { Text } from '../../src/components/Text';
 import { WeightChart, WeightStats } from '../../src/components/WeightChart';
 import { avgWeeklyLoss, coachInsight } from '../../src/lib/coach';
 import { todayBrief } from '../../src/lib/today';
+import { dayIndex, nextUnlock, unlockedToday } from '../../src/lib/journey';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
 import { formatWeight, toDisplay } from '../../src/lib/units';
 import { DAY, greeting, relativeDay } from '../../src/lib/dates';
@@ -163,6 +164,12 @@ export default function Home() {
 
   const brief = useMemo(() => todayBrief(profile, logs, now), [profile, logs, now]);
 
+  // Progressive reveal: something new most days of the first fortnight, so
+  // there is a reason to return that is not a reminder to log.
+  const day = useMemo(() => dayIndex(logs, now), [logs, now]);
+  const reveal = unlockedToday(day);
+  const upcoming = nextUnlock(day);
+
   // Persist today's score for server-side trends and the weekly digest.
   useScoreSync(score);
 
@@ -272,6 +279,32 @@ export default function Home() {
         <View style={{ marginBottom: spacing.lg }}>
           <TodayBriefing brief={brief} />
         </View>
+      ) : null}
+
+      {reveal && mode === 'today' ? (
+        <Pressable
+          onPress={() => router.push(reveal.route as never)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            padding: spacing.lg,
+            marginBottom: spacing.lg,
+            borderRadius: radius.xl,
+            backgroundColor: c.proSoft,
+          }}
+        >
+          <Ionicons name="gift-outline" size={20} color={c.pro} />
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyStrong" tone="pro">
+              Day {day}: {reveal.title} unlocked
+            </Text>
+            <Text variant="caption" tone="secondary" style={{ marginTop: 2 }}>
+              {reveal.blurb}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={c.pro} />
+        </Pressable>
       ) : null}
 
       <Pressable onPress={() => router.push('/score')}>
@@ -521,6 +554,29 @@ export default function Home() {
         </View>
         <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
       </Card>
+
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+        <Card
+          onPress={() => router.push('/journey')}
+          style={{ flex: 1, gap: spacing.sm, paddingVertical: spacing.lg }}
+        >
+          <Ionicons name="footsteps-outline" size={20} color={c.primary} />
+          <Text variant="bodyStrong">Day {day}</Text>
+          <Text variant="micro" tone="tertiary">
+            {upcoming ? `${upcoming.title} on day ${upcoming.day}` : 'Your full history'}
+          </Text>
+        </Card>
+        <Card
+          onPress={() => router.push('/tomorrow')}
+          style={{ flex: 1, gap: spacing.sm, paddingVertical: spacing.lg }}
+        >
+          <Ionicons name="flash-outline" size={20} color={c.pro} />
+          <Text variant="bodyStrong">Tomorrow</Text>
+          <Text variant="micro" tone="tertiary">
+            See what tomorrow could look like
+          </Text>
+        </Card>
+      </View>
 
       {/* GLP-1 activity — the curve with today's dot and the peak called out. */}
       <SectionTitle>GLP-1 activity</SectionTitle>

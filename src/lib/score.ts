@@ -177,7 +177,10 @@ export function computeScore(
 
   const protein = sumOn(logs, 'meal', at);
   const water = sumOn(logs, 'water', at);
-  const activity = sumOn(logs, 'activity', at);
+  // Resistance training counts toward the movement goal as well as carrying its
+  // own weight in the composition engine. Logging the single most
+  // muscle-protective thing a user can do must never score zero.
+  const activity = sumOn(logs, 'activity', at) + sumOn(logs, 'strength', at);
   const sleep = sumOn(logs, 'sleep', at);
   const weighed = anyOn(logs, 'weight', at);
   const checkedIn = anyOn(logs, 'symptom', at);
