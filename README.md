@@ -167,6 +167,23 @@ Fat and muscle are split from the week's actual weight change by the model's
 lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
 until there is enough logged for the card to say anything true.
 
+## The interactive weight chart
+
+[`WeightChart.tsx`](src/components/WeightChart.tsx) with geometry in
+[`weightChart.ts`](src/lib/weightChart.ts):
+
+- **Drag to scrub** — crosshair, the reading, and that week's change. The pan
+  gesture claims horizontal movement only (`activeOffsetX` / `failOffsetY`) so
+  vertical scrolling still belongs to the page.
+- **Pinch to zoom**, anchored at today — the recent end is the one people care
+  about, so it stays put while the window grows and shrinks behind it.
+  Double-tap resets.
+- **Phase shading** — green where the trend is falling, neutral where it holds,
+  amber where it climbs. Classified from a **centred rolling slope**, not
+  point-to-point deltas: day-to-day weight is dominated by water, so raw deltas
+  would paint the chart in meaningless stripes. Slivers under three days are
+  dropped as noise.
+
 ## Progress — a story, not a dashboard
 
 [`app/(tabs)/progress.tsx`](app/(tabs)/progress.tsx) is one long scroll in a

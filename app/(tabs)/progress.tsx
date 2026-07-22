@@ -2,10 +2,10 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Card, SectionTitle } from '../../src/components/Card';
 import { Donut } from '../../src/components/charts';
 import { Badge, Scatter, Timeline } from '../../src/components/progress-parts';
+import { ProgressHero } from '../../src/components/ProgressHero';
 import { ProGate } from '../../src/components/Pro';
 import { RangePicker } from '../../src/components/RangePicker';
 import { Screen } from '../../src/components/Screen';
@@ -85,6 +85,7 @@ export default function Progress() {
 
   const latest = weightSeries(logs).at(-1)?.value ?? profile.startWeight;
   const doses = logs.filter((l) => l.kind === 'dose').length;
+  const firstLog = logs.length ? Math.min(...logs.map((l) => l.at)) : null;
 
   return (
     <Screen scroll>
@@ -114,81 +115,27 @@ export default function Progress() {
         </Pressable>
       </View>
 
-      {/* 1 — Your body story. The narrative, before any chart. */}
-      <LinearGradient
-        colors={scheme === 'dark' ? [c.primarySoft, c.card] : [c.primarySoft, c.card]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{
-          borderRadius: 28,
-          padding: spacing.xl,
-          gap: spacing.lg,
-          borderWidth: scheme === 'dark' ? 1 : 0,
-          borderColor: c.border,
-        }}
-      >
-        <View
-          style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text variant="caption" tone="secondary">
-              Total weight lost
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
-              <Text variant="hero" tone="primary">
-                {lost != null && lost < 0 ? formatWeight(Math.abs(lost), units) : '0'}
-              </Text>
-              <Text variant="heading" tone="secondary">
-                {units}
-              </Text>
-            </View>
-            <Text variant="caption" tone="secondary" style={{ marginTop: 2 }}>
-              {progress}% of your goal
-            </Text>
-          </View>
+      {/* 1 — Hero: what you lost, how well we know you, how long you have been at it. */}
+      <ProgressHero
+        lostLb={lost != null && lost < 0 ? lost : 0}
+        startLb={profile.startWeight}
+        goalLb={profile.goalWeight}
+        units={units}
+        goalPercent={progress}
+        intelligence={learned}
+        days={day}
+        since={firstLog}
+        spark={weightSeries(logs).slice(-20)}
+      />
 
-          <View style={{ alignItems: 'center' }}>
-            <Text variant="micro" tone="tertiary">
-              BODY MODEL
-            </Text>
-            <Text variant="title" tone="primary">
-              {learned}%
-            </Text>
-            <Text variant="micro" tone="secondary">
-              learned
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ height: 8, borderRadius: 4, backgroundColor: c.track, overflow: 'hidden' }}>
-          <View style={{ width: `${progress}%`, height: '100%', backgroundColor: c.primary }} />
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text variant="micro" tone="tertiary">
-            Started{' '}
-            {profile.startWeight != null
-              ? `${formatWeight(profile.startWeight, units)} ${units}`
-              : '—'}
-          </Text>
-          <Text variant="micro" tone="tertiary">
-            Now {latest != null ? `${formatWeight(latest, units)} ${units}` : '—'}
-          </Text>
-          <Text variant="micro" tone="tertiary">
-            Goal{' '}
-            {profile.goalWeight != null ? `${formatWeight(profile.goalWeight, units)} ${units}` : '—'}
-          </Text>
-        </View>
-
-        {/* The narrative line — the thing a chart cannot say. */}
-        <Text variant="body" tone="secondary">
-          {`You have been with Calqulate for ${day} days${
-            lost != null && lost < 0 ? `, lost ${formatWeight(Math.abs(lost), units)} ${units}` : ''
-          }, kept an estimated ${comp.fatPct}% of that loss coming from fat, and logged ${doses} injection${
-            doses === 1 ? '' : 's'
-          }.`}
-        </Text>
-      </LinearGradient>
+      {/* The narrative line — the thing a chart cannot say. */}
+      <Text variant="body" tone="secondary" style={{ marginTop: spacing.lg }}>
+        {`You have been with Calqulate for ${day} days${
+          lost != null && lost < 0 ? `, lost ${formatWeight(Math.abs(lost), units)} ${units}` : ''
+        }, kept an estimated ${comp.fatPct}% of that loss coming from fat, and logged ${doses} injection${
+          doses === 1 ? '' : 's'
+        }.`}
+      </Text>
 
       {/* 2 — Journey timeline */}
       {milestones.length ? (

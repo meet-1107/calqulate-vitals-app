@@ -88,3 +88,101 @@ export function buildWeightModel(
     labelStride: Math.ceil(xy.length / maxLabels),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Phase shading
+// ---------------------------------------------------------------------------
+
+export type Phase = 'losing' | 'stable' | 'regain';
+
+export type PhaseBand = { from: number; to: number; phase: Phase };
+
+/** Pounds per day beyond which a stretch counts as moving rather than holding. */
+const PHASE_SLOPE = 0.03;
+
+/**
+ * Splits the series into losing / stable / regain stretches.
+ *
+ * Classified from a centred rolling slope rather than point-to-point deltas,
+ * because day-to-day weight is dominated by water — raw deltas would paint the
+ * chart in alternating stripes and mean nothing.
+ */
+export function phaseBands(points: WeightPoint[], windowDays = 10): PhaseBand[] {
+  if (points.length < 3) return [];
+
+  const classify = (i: number): Phase => {
+    const t = points[i].t;
+    const half = (windowDays / 2) * 86_400_000;
+    const near = points.filter((p) => Math.abs(p.t - t) <= half);
+    if (near.length < 3) return 'stable';
+
+    const first = near[0];
+    const last = near[near.length - 1];
+    const days = (last.t - first.t) / 86_400_000;
+    if (days <= 0) return 'stable';
+
+    const slope = (last.value - first.value) / days;
+    if (slope < -PHASE_SLOPE) return 'losing';
+    if (slope > PHASE_SLOPE) return 'regain';
+    return 'stable';
+  };
+
+  const bands: PhaseBand[] = [];
+  let current: PhaseBand = { from: points[0].t, to: points[0].t, phase: classify(0) };
+
+  for (let i = 1; i < points.length; i++) {
+    const phase = classify(i);
+    if (phase === current.phase) {
+      current.to = points[i].t;
+    } else {
+      current.to = points[i].t;
+      bands.push(current);
+      current = { from: points[i].t, to: points[i].t, phase };
+    }
+  }
+  bands.push(current);
+
+  // Drop slivers: a two-day blip is noise, not a phase.
+  return bands.filter((b) => b.to - b.from >= 3 * 86_400_000 || bands.length === 1);
+}
+
+/** Change over the 7 days ending at `index`, for the scrub tooltip. */
+export function weeklyChangeAt(points: WeightPoint[], index: number): number | null {
+  const target = points[index];
+  if (!target) return null;
+  const weekAgo = target.t - 7 * 86_400_000;
+
+  let prior: WeightPoint | null = null;
+  for (const p of points) {
+    if (p.t <= weekAgo) prior = p;
+    else break;
+  }
+  return prior ? target.value - prior.value : null;
+}
+
+/** Nearest point to an x pixel, for scrubbing. */
+export function indexAtX(model: WeightModel, x: number): number {
+  let best = 0;
+  let dist = Infinity;
+  model.xy.forEach((p, i) => {
+    const d = Math.abs(p.x - x);
+    if (d < dist) {
+      dist = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
+/**
+ * Applies a zoom factor to a series, keeping the most recent data anchored.
+ *
+ * Zooming out from "today" is what people actually want on a weight chart —
+ * the recent end is the interesting one, so it stays put while the window
+ * grows and shrinks behind it.
+ */
+export function zoomSeries(points: WeightPoint[], zoom: number): WeightPoint[] {
+  if (points.length < 4 || zoom >= 1) return points;
+  const keep = Math.max(3, Math.round(points.length * Math.max(0.08, zoom)));
+  return points.slice(points.length - keep);
+}
