@@ -134,6 +134,34 @@ dashboard: Overview, Users, Subscriptions, Notifications, Feature Flags, Support
 Audit Logs, Settings. See [`server/README.md`](server/README.md) for env vars and
 setup.
 
+## Personal Coach
+
+[`src/lib/coach.ts`](src/lib/coach.ts) watches the dashboard and says one thing,
+in priority order — muscle loss first, then losing-too-fast, plateau, gaining,
+slipping habits, and only then praise. A coach that congratulates you while you
+are losing muscle is worse than no coach, so the ordering is the design.
+
+It drives both the headline on the home screen and the coloured card under the
+score: green when on track, amber to watch, red to act. Every insight carries a
+concrete action that routes straight into quick-add.
+
+Two rules worth knowing: habits are only judged when there *is* habit data
+(logging nothing but weight means a low score through absence, not slipping),
+and plateau detection reuses the shared detector in `insights.ts` so the coach
+and the Progress screen can never disagree.
+
+## Weight units
+
+**Pounds are canonical.** Every stored weight — logs, start, goal, body
+composition — is in lb; kg is a display conversion applied on the way out and
+reversed on input ([`src/lib/units.ts`](src/lib/units.ts)). Storing display-unit
+numbers would corrupt history the moment someone switched units: a 183 logged as
+lb would later read as 183 kg. Switching units now changes only what is
+rendered.
+
+Default is lb for a US-first audience; the toggle lives in Settings and on the
+goal screen.
+
 ## Data — Supabase
 
 [`supabase/schema.sql`](supabase/schema.sql) is the whole backend data model:

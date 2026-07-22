@@ -20,6 +20,12 @@ contents of [`supabase/schema.sql`](supabase/schema.sql), and run it. This
 creates every table, turns on Row Level Security, and adds the trigger that
 makes a profile row whenever someone signs up.
 
+Then run [`supabase/migrations/002_dashboard.sql`](supabase/migrations/002_dashboard.sql)
+as a second query. It adds body measurements, saved daily scores, missions,
+streaks, achievements, goals, and coach insights — and converts any weights
+already stored in kilograms to pounds, which is now the canonical unit. Both
+files are safe to re-run.
+
 Before running it, change the email near the bottom to yours:
 
 ```sql

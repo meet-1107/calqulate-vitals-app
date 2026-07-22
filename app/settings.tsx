@@ -6,6 +6,7 @@ import { Screen } from '../src/components/Screen';
 import { Text } from '../src/components/Text';
 import { restore } from '../src/lib/billing';
 import { formatHour } from '../src/lib/dates';
+import { formatWeight } from '../src/lib/units';
 import { useProfile } from '../src/store/profile';
 import type { Units } from '../src/store/types';
 import { useColors } from '../src/theme/ThemeProvider';
@@ -111,6 +112,21 @@ export default function Settings() {
               trackColor={{ true: c.primary, false: c.track }}
             />
           }
+        />
+      </Card>
+
+      <SectionTitle>Weight goal</SectionTitle>
+      <Card>
+        <Row
+          label="Starting weight"
+          value={profile.startWeight != null ? `${formatWeight(profile.startWeight, s.units)} ${s.units}` : 'Not set'}
+          onPress={() => router.push('/goal')}
+        />
+        <View style={{ height: 1, backgroundColor: c.border }} />
+        <Row
+          label="Goal weight"
+          value={profile.goalWeight != null ? `${formatWeight(profile.goalWeight, s.units)} ${s.units}` : 'Not set'}
+          onPress={() => router.push('/goal')}
         />
       </Card>
 

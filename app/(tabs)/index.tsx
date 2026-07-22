@@ -3,20 +3,34 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Card, SectionTitle } from '../../src/components/Card';
-import { LineChart, Meter, Ring, StackedBar } from '../../src/components/charts';
+import { Meter, Ring, StackedBar } from '../../src/components/charts';
+import { CoachCard } from '../../src/components/CoachCard';
 import { PKChart } from '../../src/components/PKChart';
 import { LogoLockup } from '../../src/components/Logo';
 import { ProGate } from '../../src/components/Pro';
+import { RangePicker } from '../../src/components/RangePicker';
 import { ScoreCard } from '../../src/components/ScoreCard';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
+import { WeightChart, WeightStats } from '../../src/components/WeightChart';
+import { avgWeeklyLoss, coachInsight } from '../../src/lib/coach';
+import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
+import { formatWeight, toDisplay } from '../../src/lib/units';
 import { DAY, greeting, relativeDay } from '../../src/lib/dates';
 import { statsFor, symptomTrend, weekStats } from '../../src/lib/daycompare';
 import { computeBodyComp, leanLossFraction } from '../../src/lib/bodycomp';
-import { changeOverDays, computeToday, goalProgress, todayForecast, weightSeries } from '../../src/lib/insights';
+import {
+  changeOverDays,
+  computeToday,
+  goalProgress,
+  todayForecast,
+  totalChange,
+  weightSeries,
+} from '../../src/lib/insights';
 import { getMedication } from '../../src/lib/medications';
 import { levelSeries } from '../../src/lib/pk';
 import { computeScore } from '../../src/lib/score';
+import { useScoreSync } from '../../src/hooks/useScoreSync';
 import { useProfile } from '../../src/store/profile';
 import { useColors, useTheme } from '../../src/theme/ThemeProvider';
 import { radius, spacing } from '../../src/theme';
@@ -128,6 +142,7 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const { profile, logs } = useProfile();
   const [mode, setMode] = useState<Mode>('today');
+  const [range, setRange] = useState(30);
 
   const units = profile.settings.units;
   const chartWidth = width - spacing.xl * 2 - (spacing.lg + 2) * 2;
@@ -139,9 +154,24 @@ export default function Home() {
   const scorePrev = useMemo(() => computeScore(profile, logs, at - DAY), [profile, logs, at]);
   const comp = useMemo(() => computeBodyComp(profile, logs), [profile, logs]);
   const forecast = useMemo(() => todayForecast(profile, logs, at), [profile, logs, at]);
-  const trend = useMemo(() => weightSeries(logs).slice(-30), [logs]);
   const week = changeOverDays(logs, 7);
   const progress = goalProgress(profile, logs);
+  const total = totalChange(profile, logs);
+  const coach = useMemo(() => coachInsight(profile, logs, score, now), [profile, logs, score, now]);
+
+  // Persist today's score for server-side trends and the weekly digest.
+  useScoreSync(score);
+
+  // Free accounts see 90 days; Vitals keeps the whole timeline.
+  const windowDays = profile.isPro ? range : Math.min(range, FREE_HISTORY_DAYS);
+  const rangeSeries = useMemo(
+    () => weightSeries(logs).filter((p) => p.t >= now - windowDays * DAY),
+    [logs, windowDays, now],
+  );
+  const weeklyAvg = useMemo(() => avgWeeklyLoss(logs, windowDays, now), [logs, windowDays, now]);
+  const latestWeight = rangeSeries.at(-1)?.value ?? profile.startWeight;
+  const toGo =
+    latestWeight != null && profile.goalWeight != null ? latestWeight - profile.goalWeight : null;
 
   // Day-vs-day tiles (or weekly averages in week mode).
   const dayNow = useMemo(() => statsFor(logs, at), [logs, at]);
@@ -218,14 +248,14 @@ export default function Home() {
         </Pressable>
       </View>
 
+      {/* Greeting sits above the headline: the name is context, the verdict is
+          the message. */}
       <View style={{ marginBottom: spacing.md }}>
-        <Text variant="title">
-          {greeting()}, {profile.name || 'there'}
+        <Text variant="body" tone="secondary">
+          {greeting()}, {profile.name || 'there'} 👋
         </Text>
-        <Text variant="caption" tone="secondary" style={{ marginTop: 2 }}>
-          {week != null && week < 0
-            ? "You're on track! Keep the momentum going."
-            : 'Every log makes your picture sharper.'}
+        <Text variant="hero" style={{ marginTop: 2 }}>
+          {coach.headline}
         </Text>
       </View>
 
@@ -236,6 +266,11 @@ export default function Home() {
       <Pressable onPress={() => router.push('/score')}>
         <ScoreCard score={score} delta={scoreDelta} />
       </Pressable>
+
+      {/* Coach sits directly under the score so a warning is impossible to miss. */}
+      <View style={{ marginTop: spacing.lg }}>
+        <CoachCard insight={coach} />
+      </View>
 
       {/* Today's Body — how healthy the loss is, not how big. */}
       {comp && comp.totalLost < 0 ? (
@@ -270,13 +305,13 @@ export default function Home() {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.pro }} />
                     <Text variant="caption" tone="secondary">
                       Fat {bodyDelta.fat <= 0 ? '−' : '+'}
-                      {Math.abs(bodyDelta.fat).toFixed(1)} {units} · 7d
+                      {formatWeight(Math.abs(bodyDelta.fat), units)} {units} · 7d
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
                     <Text variant="caption" tone="secondary">
-                      Muscle {Math.abs(bodyDelta.lean) < 0.15 ? 'stable' : `${bodyDelta.lean <= 0 ? '−' : '+'}${Math.abs(bodyDelta.lean).toFixed(1)} ${units}`} · 7d
+                      Muscle {Math.abs(toDisplay(bodyDelta.lean, units)) < 0.15 ? 'stable' : `${bodyDelta.lean <= 0 ? '−' : '+'}${formatWeight(Math.abs(bodyDelta.lean), units)} ${units}`} · 7d
                     </Text>
                   </View>
                 </View>
@@ -300,10 +335,10 @@ export default function Home() {
             <CompareTile
               icon="scale-outline"
               label="Weight"
-              value={weekAgg.weight != null ? `${weekAgg.weight.toFixed(1)} ${units}` : '—'}
+              value={weekAgg.weight != null ? `${formatWeight(weekAgg.weight, units)} ${units}` : '—'}
               delta={
                 weekAgg.weightChange != null
-                  ? `${weekAgg.weightChange <= 0 ? '↓' : '↑'} ${Math.abs(weekAgg.weightChange).toFixed(1)} ${units} / 7d`
+                  ? `${weekAgg.weightChange <= 0 ? '↓' : '↑'} ${formatWeight(Math.abs(weekAgg.weightChange), units)} ${units} / 7d`
                   : null
               }
               good={weekAgg.weightChange != null && weekAgg.weightChange <= 0}
@@ -330,10 +365,10 @@ export default function Home() {
             <CompareTile
               icon="scale-outline"
               label="Weight"
-              value={dayNow.weight != null ? `${dayNow.weight.toFixed(1)} ${units}` : '—'}
+              value={dayNow.weight != null ? `${formatWeight(dayNow.weight, units)} ${units}` : '—'}
               delta={
                 dayNow.weight != null && dayPrev.weight != null
-                  ? `${dayNow.weight - dayPrev.weight <= 0 ? '↓' : '↑'} ${Math.abs(dayNow.weight - dayPrev.weight).toFixed(1)} ${units}`
+                  ? `${dayNow.weight - dayPrev.weight <= 0 ? '↓' : '↑'} ${formatWeight(Math.abs(dayNow.weight - dayPrev.weight), units)} ${units}`
                   : null
               }
               good={dayNow.weight != null && dayPrev.weight != null && dayNow.weight <= dayPrev.weight}
@@ -381,6 +416,74 @@ export default function Home() {
           </>
         )}
       </ScrollView>
+
+      {/* Weight trend — the chart plus the three numbers that answer
+          "is this working?": total change, weekly pace, and goal progress. */}
+      <Card style={{ marginTop: spacing.xl, gap: spacing.lg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text variant="heading">Weight Trend</Text>
+          <RangePicker
+            value={range}
+            onChange={setRange}
+            lockedFrom={profile.isPro ? undefined : FREE_HISTORY_DAYS}
+          />
+        </View>
+
+        <WeightChart
+          data={rangeSeries}
+          units={units}
+          width={chartWidth}
+          height={220}
+          goal={profile.goalWeight}
+        />
+
+        {profile.goalWeight == null ? (
+          <Pressable
+            onPress={() => router.push('/goal')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              padding: spacing.lg,
+              borderRadius: radius.lg,
+              backgroundColor: c.primarySoft,
+            }}
+          >
+            <Ionicons name="flag-outline" size={20} color={c.primary} />
+            <Text variant="caption" tone="primary" style={{ flex: 1 }}>
+              Set a goal weight to unlock progress tracking
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={c.primary} />
+          </Pressable>
+        ) : null}
+
+        <WeightStats
+          units={units}
+          totalChange={
+            total != null ? `${total <= 0 ? '↓' : '↑'} ${formatWeight(Math.abs(total), units)} ${units}` : '—'
+          }
+          bodyFraction={
+            total != null && profile.startWeight
+              ? `${Math.abs((total / profile.startWeight) * 100).toFixed(1)}% of body weight`
+              : undefined
+          }
+          avgWeekly={
+            weeklyAvg != null
+              ? `${weeklyAvg <= 0 ? '↓' : '↑'} ${formatWeight(Math.abs(weeklyAvg), units)} ${units}`
+              : '—'
+          }
+          goalPercent={progress}
+          toGo={
+            toGo != null && toGo > 0 ? `${formatWeight(toGo, units)} ${units} to go` : 'Goal reached'
+          }
+        />
+
+        {!profile.isPro && range > FREE_HISTORY_DAYS ? (
+          <Text variant="caption" tone="pro">
+            Showing the last {FREE_HISTORY_DAYS} days. Vitals keeps your full timeline.
+          </Text>
+        ) : null}
+      </Card>
 
       {/* GLP-1 activity — the curve with today's dot and the peak called out. */}
       <SectionTitle>GLP-1 activity</SectionTitle>
@@ -512,7 +615,7 @@ export default function Home() {
                 Lost
               </Text>
               <Text variant="title" tone="primary">
-                {Math.abs(week).toFixed(1)} {units}
+                {formatWeight(Math.abs(week), units)} {units}
               </Text>
               <Text variant="body" tone="secondary">
                 this week · {fatShare}% was body fat
@@ -566,20 +669,6 @@ export default function Home() {
         </Card>
       </ProGate>
 
-      <SectionTitle
-        action={
-          <Pressable onPress={() => router.push('/(tabs)/progress')}>
-            <Text variant="caption" tone="primary">
-              See all
-            </Text>
-          </Pressable>
-        }
-      >
-        Weight trend
-      </SectionTitle>
-      <Card>
-        <LineChart data={trend} width={chartWidth} height={140} />
-      </Card>
     </Screen>
   );
 }

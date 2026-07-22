@@ -23,6 +23,7 @@ import { LineChart, Ring } from '../src/components/charts';
 import { Text } from '../src/components/Text';
 import { WheelPicker } from '../src/components/WheelPicker';
 import { changeOverDays, weightSeries } from '../src/lib/insights';
+import { formatWeight, toDisplay, toStored } from '../src/lib/units';
 import { getMedication } from '../src/lib/medications';
 import { useProfile } from '../src/store/profile';
 import type { LogKind, Units } from '../src/store/types';
@@ -216,7 +217,9 @@ function QuickAddInner() {
 
   // Weight state
   const lastWeight = useMemo(() => weightSeries(logs).at(-1)?.value ?? null, [logs]);
-  const [weight, setWeight] = useState(lastWeight ?? (units === 'lb' ? 180 : 83));
+  const [weight, setWeight] = useState(
+    lastWeight != null ? toDisplay(lastWeight, units) : units === 'lb' ? 180 : 83,
+  );
   const [mood, setMood] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const weekChange = useMemo(() => changeOverDays(logs, 7), [logs]);
@@ -389,7 +392,7 @@ function QuickAddInner() {
                           color={ACCENT.weight.tint}
                         />
                         <Text variant="micro" style={{ color: ACCENT.weight.tint }}>
-                          {Math.abs(weekChange).toFixed(1)} {units} vs last 7 days
+                          {formatWeight(Math.abs(weekChange), units)} {units} vs last 7 days
                         </Text>
                       </View>
                     ) : null}
@@ -409,9 +412,9 @@ function QuickAddInner() {
                 </View>
                 {lastWeight != null ? (
                   <Text variant="micro" tone="tertiary" style={{ marginTop: 2 }}>
-                    Previous {lastWeight.toFixed(1)} {units} ·{' '}
-                    {weight - lastWeight <= 0 ? '−' : '+'}
-                    {Math.abs(weight - lastWeight).toFixed(1)} {units}
+                    Previous {formatWeight(lastWeight, units)} {units} ·{' '}
+                    {weight - toDisplay(lastWeight, units) <= 0 ? '−' : '+'}
+                    {Math.abs(weight - toDisplay(lastWeight, units)).toFixed(1)} {units}
                   </Text>
                 ) : null}
               </View>
@@ -466,7 +469,7 @@ function QuickAddInner() {
                 kind="weight"
                 label="Save Weight"
                 onPress={() =>
-                  save('weight', weight, {
+                  save('weight', toStored(weight, units), {
                     note:
                       [note.trim(), mood != null ? `Mood ${MOODS[mood]}` : '']
                         .filter(Boolean)

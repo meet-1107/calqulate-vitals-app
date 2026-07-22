@@ -161,6 +161,46 @@ export async function pullRemote(userId: string): Promise<RemoteState> {
   }
 }
 
+/**
+ * Saves today's Metabolic Score.
+ *
+ * The client can always recompute this from logs, so the row exists for what
+ * the client cannot do: server-side trends, weekly digests, and the admin
+ * panel, without replaying a user's entire log history. Upserted on
+ * (user_id, scored_on), so writing repeatedly through the day is harmless.
+ */
+export async function pushScore(
+  userId: string,
+  scoredOn: string,
+  score: { total: number; band: string; available: number; lines: { id: string; earned: number }[] },
+) {
+  if (!supabase) return;
+  await supabase
+    .from('metabolic_scores')
+    .upsert(
+      {
+        user_id: userId,
+        scored_on: scoredOn,
+        total: score.total,
+        band: score.band,
+        available: score.available,
+        components: Object.fromEntries(score.lines.map((l) => [l.id, l.earned])),
+      },
+      { onConflict: 'user_id,scored_on' },
+    )
+    .then(undefined, () => {});
+}
+
+/** Records the active weight goal, keeping previous goals as history. */
+export async function pushGoal(userId: string, startLb: number, goalLb: number) {
+  if (!supabase) return;
+  await supabase.from('goals').update({ active: false }).eq('user_id', userId).eq('active', true);
+  await supabase
+    .from('goals')
+    .insert({ user_id: userId, start_weight_lb: startLb, goal_weight_lb: goalLb })
+    .then(undefined, () => {});
+}
+
 /** Uploads anything created before sign-in, so nothing logged offline is lost. */
 export async function pushAll(userId: string, profile: Profile, logs: LogEntry[]) {
   if (!supabase) return;

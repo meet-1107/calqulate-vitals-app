@@ -1,4 +1,5 @@
 import { getMedication } from './medications';
+import { formatWeight } from './units';
 import { levelPercent } from './pk';
 import { DAY, isSameDay, nextInjection, startOfDay } from './dates';
 import type { LogEntry, Profile } from '../store/types';
@@ -301,7 +302,7 @@ export function coachMessage(profile: Profile, logs: LogEntry[], today: Today): 
     return "That's a fast week. Keep protein up so the loss stays fat, not muscle.";
   }
   if (weekly != null && weekly < 0) {
-    return `Down ${Math.abs(weekly).toFixed(1)} ${units} this week — exactly as expected.`;
+    return `Down ${formatWeight(Math.abs(weekly), units)} ${units} this week — exactly as expected.`;
   }
   if (today.proteinPct < 50) {
     return `Protein is at ${today.proteinG} g. Aim for ${profile.goals.proteinG} g today.`;

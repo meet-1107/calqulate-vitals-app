@@ -6,6 +6,7 @@ import { DAY, startOfDay } from './dates';
 import { changeOverDays } from './insights';
 import { leanLossFraction } from './bodycomp';
 import { computeScore } from './score';
+import { formatWeight } from './units';
 import type { LogEntry, Profile } from '../store/types';
 import type { StoryCard } from '../components/StoryCards';
 
@@ -19,14 +20,14 @@ export function weeklyStory(profile: Profile, logs: LogEntry[], now = Date.now()
     cards.push({
       icon: 'trending-down',
       kicker: 'This week',
-      value: `−${Math.abs(week).toFixed(1)} ${units}`,
-      message: `You lost ${Math.abs(week).toFixed(1)} ${units} — an estimated ${fatShare}% of it was body fat.`,
+      value: `−${formatWeight(Math.abs(week), units)} ${units}`,
+      message: `You lost ${formatWeight(Math.abs(week), units)} ${units} — an estimated ${fatShare}% of it was body fat.`,
     });
   } else if (week != null) {
     cards.push({
       icon: 'analytics',
       kicker: 'This week',
-      value: `${week >= 0 ? '+' : ''}${week.toFixed(1)} ${units}`,
+      value: `${week >= 0 ? '+' : ''}${formatWeight(week, units)} ${units}`,
       message:
         'Weight held steady this week. Plateaus are a normal part of the journey — consistency is what breaks them.',
     });

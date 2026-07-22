@@ -19,6 +19,7 @@ import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { DAY } from '../../src/lib/dates';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
+import { formatWeight } from '../../src/lib/units';
 import { computeBenchmark } from '../../src/lib/benchmark';
 import { computeBodyComp, riverWeeks } from '../../src/lib/bodycomp';
 import {
@@ -220,8 +221,8 @@ export default function Progress() {
               <StackedBar
                 a={comp.fatLost}
                 b={comp.leanLost}
-                aLabel={`Fat ${comp.fatLost.toFixed(1)} ${units}`}
-                bLabel={`Muscle ${comp.leanLost.toFixed(1)} ${units}`}
+                aLabel={`Fat ${formatWeight(comp.fatLost, units)} ${units}`}
+                bLabel={`Muscle ${formatWeight(comp.leanLost, units)} ${units}`}
               />
             </View>
 
@@ -302,8 +303,8 @@ export default function Progress() {
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
         <Ring percent={progress} size={112} caption="to goal" />
         <View style={{ flex: 1, gap: spacing.md }}>
-          <StatTile label="Start" value={profile.startWeight?.toFixed(1) ?? '—'} unit={units} />
-          <StatTile label="Goal" value={profile.goalWeight?.toFixed(1) ?? '—'} unit={units} />
+          <StatTile label="Start" value={profile.startWeight != null ? formatWeight(profile.startWeight, units) : '—'} unit={units} />
+          <StatTile label="Goal" value={profile.goalWeight != null ? formatWeight(profile.goalWeight, units) : '—'} unit={units} />
         </View>
       </Card>
 
@@ -325,7 +326,7 @@ export default function Progress() {
           ) : null}
           <Text variant="body">
             {goalDate
-              ? `At your current pace you reach ${profile.goalWeight} ${units} around ${goalDate.toLocaleDateString(
+              ? `At your current pace you reach ${formatWeight(profile.goalWeight!, units)} ${units} around ${goalDate.toLocaleDateString(
                   undefined,
                   { month: 'long', year: 'numeric' },
                 )}.`
