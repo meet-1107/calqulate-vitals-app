@@ -17,6 +17,7 @@ import { WeightChart, WeightStats } from '../../src/components/WeightChart';
 import { avgWeeklyLoss, coachInsight } from '../../src/lib/coach';
 import { todayBrief } from '../../src/lib/today';
 import { dayIndex, nextUnlock, unlockedToday } from '../../src/lib/journey';
+import { buildIntelligence } from '../../src/lib/intelligence';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
 import { formatWeight, toDisplay } from '../../src/lib/units';
 import { DAY, greeting, relativeDay } from '../../src/lib/dates';
@@ -168,6 +169,7 @@ export default function Home() {
   // there is a reason to return that is not a reminder to log.
   const day = useMemo(() => dayIndex(logs, now), [logs, now]);
   const reveal = unlockedToday(day);
+  const intel = useMemo(() => buildIntelligence(profile, logs, now), [profile, logs, now]);
   const upcoming = nextUnlock(day);
 
   // Persist today's score for server-side trends and the weekly digest.
@@ -567,13 +569,21 @@ export default function Home() {
           </Text>
         </Card>
         <Card
-          onPress={() => router.push('/tomorrow')}
+          onPress={() => router.push('/intelligence')}
           style={{ flex: 1, gap: spacing.sm, paddingVertical: spacing.lg }}
         >
           <Ionicons name="flash-outline" size={20} color={c.pro} />
-          <Text variant="bodyStrong">Tomorrow</Text>
+          <Text variant="bodyStrong">
+            {intel.prediction
+              ? `${formatWeight(intel.prediction.value, units)} ${units}`
+              : 'Intelligence'}
+          </Text>
           <Text variant="micro" tone="tertiary">
-            See what tomorrow could look like
+            {intel.prediction
+              ? `Tomorrow · ${intel.prediction.confidence}% confidence`
+              : intel.patterns.length
+                ? `${intel.patterns.length} pattern${intel.patterns.length === 1 ? '' : 's'} found`
+                : `Learning · ${intel.next?.title ?? 'day ' + intel.day}`}
           </Text>
         </Card>
       </View>

@@ -167,6 +167,40 @@ Fat and muscle are split from the week's actual weight change by the model's
 lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
 until there is enough logged for the card to say anything true.
 
+## Body Intelligence™ — progressive disclosure
+
+The ladder, in [`src/lib/intelligence.ts`](src/lib/intelligence.ts):
+
+```
+Week 1  Observation    what you did
+Week 2  Patterns       what tends to go with what
+Week 3  Prediction     what tomorrow probably looks like   ← free
+Week 4+ Optimization   what changes it                     ← Decision Engine, paid
+```
+
+**Stages advance on days elapsed AND data sufficiency, never days alone.**
+Announcing "we understand your metabolism" on day 14 to someone who logged four
+times would be a lie, and the first prediction would embarrass itself. A user
+short on data is told exactly what is missing instead. Verified: a 30-day
+account with two weigh-ins stays at Observation and reports "1 more weigh-in".
+
+**Patterns** ([`patterns.ts`](src/lib/patterns.ts)) obey three rules, because a
+confident pattern drawn from six days is a lie that happens to be well
+formatted: a minimum of 10 paired observations, a minimum effect size, and
+copy that says "tracks with" rather than "causes". Each card shows its own
+sample size and r.
+
+**The prediction is free** ([`prediction.ts`](src/lib/prediction.ts)) — a
+least-squares fit with a real interval from residual spread, floored at ±0.9 lb
+because water and glycogen swing a pound either way no matter what. Thin or
+noisy data widens the interval and drops confidence, which is correct even
+though it makes the feature look weaker.
+
+**The Decision Engine is what's paid for.** It refuses to invent a satisfying
+number: one day of extra protein moves the scale by hundredths of a pound, so it
+says so, and leads with the composition shift instead — the effect that is
+actually real. When a lever is already at target it says that too.
+
 ## Tomorrow Simulator™
 
 [`src/lib/tomorrow.ts`](src/lib/tomorrow.ts) answers "what happens if…" instead

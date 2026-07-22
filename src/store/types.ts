@@ -34,6 +34,8 @@ export type Profile = {
   heightCm: number | null;
   /** Measured body fat %, when the user has a scan or smart scale. */
   bodyFatPct: number | null;
+  /** When the Body Intelligence model was first revealed, so it fires once. */
+  modelUnlockedAt: number | null;
   reason: Reason | null;
   medication: MedicationId | null;
   doseMg: number | null;
@@ -99,6 +101,7 @@ export const DEFAULT_STATE: AppState = {
     sex: null,
     heightCm: null,
     bodyFatPct: null,
+    modelUnlockedAt: null,
     reason: null,
     medication: null,
     doseMg: null,

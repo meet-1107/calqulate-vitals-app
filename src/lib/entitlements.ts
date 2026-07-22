@@ -47,6 +47,11 @@ export type FeatureId =
   | 'glp1.refill-tracking'
   | 'glp1.protein-lookup-unlimited'
   // Future You / Autopilot / History
+  | 'intelligence.observation'
+  | 'intelligence.patterns'
+  | 'intelligence.prediction'
+  | 'intelligence.decision-engine'
+  | 'intelligence.forecast'
   | 'future.scenarios'
   | 'autopilot.adaptive-plan'
   | 'history.90-days'
@@ -131,6 +136,25 @@ export const FEATURES: Feature[] = [
   { id: 'glp1.protein-lookup-unlimited', section: 'GLP-1 Tracker', tier: 'premium', title: 'Check the protein in as many meals as you like' },
 
   // ---- Future You / Autopilot / History ----
+  { id: 'intelligence.observation', section: 'Overview', tier: 'free', title: 'See what you actually did, every day' },
+  { id: 'intelligence.patterns', section: 'Overview', tier: 'free', title: 'Discover the patterns hiding in your own data' },
+  {
+    id: 'intelligence.prediction',
+    section: 'Future You',
+    tier: 'free',
+    title: 'Know what tomorrow is likely to look like',
+    freeLimit: 'one prediction',
+  },
+  {
+    id: 'intelligence.decision-engine',
+    section: 'Future You',
+    tier: 'premium',
+    title: 'Change tomorrow, not just predict it',
+    detail:
+      'Knowing the future is interesting. Simulate any change — protein, sleep, training — and see what it does to your weight and your muscle.',
+    headline: true,
+  },
+  { id: 'intelligence.forecast', section: 'Future You', tier: 'premium', title: 'See the next seven days, not just tomorrow' },
   { id: 'future.scenarios', section: 'Future You', tier: 'premium', title: 'See your best case, likely case and worst case', headline: true },
   { id: 'autopilot.adaptive-plan', section: 'Autopilot', tier: 'premium', title: 'Get a plan that adapts as your body changes', headline: true },
   { id: 'history.90-days', section: 'History', tier: 'free', title: 'Look back over your last 90 days' },

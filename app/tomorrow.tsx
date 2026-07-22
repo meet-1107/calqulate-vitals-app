@@ -57,7 +57,7 @@ export default function TomorrowScreen() {
         What tomorrow looks like, depending on what you do.
       </Text>
 
-      <ProGate feature="future.scenarios">
+      <ProGate feature="intelligence.decision-engine">
         <>
           <LinearGradient
             colors={scheme === 'dark' ? [c.primarySoft, c.card] : [c.primarySoft, c.card]}

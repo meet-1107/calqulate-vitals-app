@@ -31,6 +31,7 @@ export type UnlockId =
   | 'hydration'
   | 'protein'
   | 'weekly-report'
+  | 'patterns'
   | 'composition'
   | 'prediction';
 
@@ -52,8 +53,9 @@ export const UNLOCKS: Unlock[] = [
   { id: 'hydration', day: 5, title: 'Hydration Trend', blurb: 'How water tracks with side effects', route: '/(tabs)/progress', icon: 'water-outline' },
   { id: 'protein', day: 6, title: 'Protein Quality', blurb: 'Whether your intake protects muscle', route: '/(tabs)/progress', icon: 'nutrition-outline' },
   { id: 'weekly-report', day: 7, title: 'Weekly Report', blurb: 'Your first shareable scorecard', route: '/report', icon: 'ribbon-outline' },
+  { id: 'patterns', day: 8, title: 'Your Patterns', blurb: 'What tends to go with what, in your data', route: '/intelligence', icon: 'git-compare-outline' },
   { id: 'composition', day: 10, title: 'Body Composition', blurb: 'Fat versus muscle, with confidence', route: '/composition', icon: 'body-outline' },
-  { id: 'prediction', day: 14, title: 'Tomorrow Simulator', blurb: 'See what tomorrow would look like', route: '/tomorrow', icon: 'flash-outline' },
+  { id: 'prediction', day: 14, title: 'Your Body Model', blurb: 'Your first prediction, free', route: '/intelligence', icon: 'flash-outline' },
 ];
 
 /** Day 1 is the first day the user logged anything. */
