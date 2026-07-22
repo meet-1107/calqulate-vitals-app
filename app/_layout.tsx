@@ -25,6 +25,7 @@ function Navigator() {
         <Stack.Screen name="quick-add" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="paywall" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="plans" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="report" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );

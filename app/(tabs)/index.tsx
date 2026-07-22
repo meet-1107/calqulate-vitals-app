@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Card, SectionTitle } from '../../src/components/Card';
 import { Meter, Ring, StackedBar } from '../../src/components/charts';
 import { CoachCard } from '../../src/components/CoachCard';
+import { TodayBriefing } from '../../src/components/TodayBriefing';
 import { PKChart } from '../../src/components/PKChart';
 import { LogoLockup } from '../../src/components/Logo';
 import { ProGate } from '../../src/components/Pro';
@@ -14,6 +15,7 @@ import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { WeightChart, WeightStats } from '../../src/components/WeightChart';
 import { avgWeeklyLoss, coachInsight } from '../../src/lib/coach';
+import { todayBrief } from '../../src/lib/today';
 import { FREE_HISTORY_DAYS } from '../../src/lib/entitlements';
 import { formatWeight, toDisplay } from '../../src/lib/units';
 import { DAY, greeting, relativeDay } from '../../src/lib/dates';
@@ -159,6 +161,8 @@ export default function Home() {
   const total = totalChange(profile, logs);
   const coach = useMemo(() => coachInsight(profile, logs, score, now), [profile, logs, score, now]);
 
+  const brief = useMemo(() => todayBrief(profile, logs, now), [profile, logs, now]);
+
   // Persist today's score for server-side trends and the weekly digest.
   useScoreSync(score);
 
@@ -262,6 +266,13 @@ export default function Home() {
       <View style={{ marginBottom: spacing.lg }}>
         <ModeSwitch value={mode} onChange={setMode} />
       </View>
+
+      {/* The daily briefing leads: it has value before anything is logged. */}
+      {mode === 'today' ? (
+        <View style={{ marginBottom: spacing.lg }}>
+          <TodayBriefing brief={brief} />
+        </View>
+      ) : null}
 
       <Pressable onPress={() => router.push('/score')}>
         <ScoreCard score={score} delta={scoreDelta} />
@@ -483,6 +494,32 @@ export default function Home() {
             Showing the last {FREE_HISTORY_DAYS} days. Vitals keeps your full timeline.
           </Text>
         ) : null}
+      </Card>
+
+      {/* Weekly report — the shareable artifact. */}
+      <Card
+        onPress={() => router.push('/report')}
+        style={{ marginTop: spacing.xl, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
+      >
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: radius.md,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: c.proSoft,
+          }}
+        >
+          <Ionicons name="share-social-outline" size={20} color={c.pro} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyStrong">Your weekly report</Text>
+          <Text variant="caption" tone="secondary" style={{ marginTop: 2 }}>
+            Score, body composition and adherence — ready to share
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
       </Card>
 
       {/* GLP-1 activity — the curve with today's dot and the peak called out. */}

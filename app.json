@@ -36,7 +36,8 @@
           "defaultChannel": "reminders"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": false,

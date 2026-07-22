@@ -134,6 +134,39 @@ dashboard: Overview, Users, Subscriptions, Notifications, Feature Flags, Support
 Audit Logs, Settings. See [`server/README.md`](server/README.md) for env vars and
 setup.
 
+## Today Intelligence — the free hook
+
+[`src/lib/today.ts`](src/lib/today.ts) is the daily briefing, and it is the
+first thing on the home screen: GLP-1 activity, expected hunger and energy,
+a protein target, a hydration target, a workout window, the Metabolic Score,
+and the day's mission points.
+
+It is free and it has value *before* the user logs anything, which is what makes
+it a reason to open the app each morning rather than a chore to feed. Every
+field is derived and can explain itself: protein is 1 g per lb of lean mass
+(falling back to 1.6 g/kg of body weight), hydration is half an ounce per pound,
+and hunger and energy follow the dose cycle. The workout window reflects when
+the user actually trains once there are three activity logs, because the session
+someone will really do beats the theoretically optimal one.
+
+## Weekly report — the shareable artifact
+
+[`app/report.tsx`](app/report.tsx) renders a card and captures it as a PNG for
+the OS share sheet, so it lands in a story or a doctor's inbox as an image, not
+a link that needs an account.
+
+**On the comparison line.** A claim like "better than 93% of similar users"
+needs a cohort we do not have; inventing a percentile and printing it on
+something people post publicly is fabricating a statistic. The card compares
+against **published clinical-trial figures** instead and names the source on its
+face — "ahead of the STEP-1 average" is a claim with a citation behind it. When
+real cohort data exists, the shape in
+[`weeklyReport.ts`](src/lib/weeklyReport.ts) is ready for it.
+
+Fat and muscle are split from the week's actual weight change by the model's
+lean-loss fraction, so the parts always sum to the whole. Sharing is disabled
+until there is enough logged for the card to say anything true.
+
 ## Personal Coach
 
 [`src/lib/coach.ts`](src/lib/coach.ts) watches the dashboard and says one thing,
