@@ -2,9 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Card, SectionTitle } from '../../src/components/Card';
-import { LineChart, Meter } from '../../src/components/charts';
 import { PKChart } from '../../src/components/PKChart';
 import { ProBlur } from '../../src/components/ProBlur';
 import { ProGate } from '../../src/components/Pro';
@@ -110,8 +108,6 @@ export default function MedicationTab() {
   }, [today.nextInjection, now]);
 
   const hasDose = profile.doseMg != null && profile.doseMg > 0;
-  const gradient: [string, string] =
-    scheme === 'dark' ? [palette.green700, palette.green600] : [palette.green500, palette.green600];
 
   return (
     <Screen scroll>
@@ -239,159 +235,6 @@ export default function MedicationTab() {
           </Card>
         </>
       ) : null}
-
-      {/* NEXT DOSE hero */}
-      <LinearGradient
-        colors={gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ borderRadius: radius.xl, overflow: 'hidden' }}
-      >
-        <View style={{ padding: spacing.xl }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255,255,255,0.18)',
-              }}
-            >
-              <Ionicons name="calendar" size={20} color="#FFFFFF" />
-            </View>
-            <Text variant="micro" style={{ color: 'rgba(255,255,255,0.85)', letterSpacing: 1.5 }}>
-              NEXT DOSE
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Ionicons name="medkit" size={44} color="rgba(255,255,255,0.35)" />
-          </View>
-
-          <Text variant="title" style={{ color: '#FFFFFF', marginTop: spacing.lg }}>
-            {profile.medication ? med.name : 'No medication set'}
-          </Text>
-
-          {hasDose ? (
-            <View
-              style={{
-                alignSelf: 'flex-start',
-                marginTop: spacing.sm,
-                paddingHorizontal: spacing.md,
-                paddingVertical: 4,
-                borderRadius: radius.pill,
-                backgroundColor: '#FFFFFF',
-              }}
-            >
-              <Text variant="caption" style={{ color: palette.green600, fontWeight: '700' }}>
-                {profile.doseMg} {profile.doseUnit ?? 'mg'}
-              </Text>
-            </View>
-          ) : null}
-
-          <Text variant="body" style={{ color: 'rgba(255,255,255,0.9)', marginTop: spacing.md }}>
-            {today.nextInjection
-              ? `${today.nextInjection.toLocaleDateString(undefined, {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-                })} · ${today.nextInjection.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-              : 'Set your injection day in Settings to see your schedule'}
-          </Text>
-        </View>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.md,
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.lg,
-            backgroundColor: 'rgba(0,0,0,0.14)',
-          }}
-        >
-          <Ionicons name="time-outline" size={20} color="rgba(255,255,255,0.85)" />
-          <View style={{ flex: 1 }}>
-            <Text variant="caption" style={{ color: '#FFFFFF', fontWeight: '600' }}>
-              {countdown ?? 'No schedule yet'}
-            </Text>
-            <Text variant="micro" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              until next dose
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => addLog('dose', profile.doseMg ?? 0, { label: med.name })}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.md,
-              borderRadius: radius.pill,
-              backgroundColor: '#FFFFFF',
-            }}
-          >
-            <Text variant="caption" style={{ color: palette.green600, fontWeight: '700' }}>
-              Log dose taken
-            </Text>
-            <Ionicons name="chevron-forward" size={14} color={palette.green600} />
-          </Pressable>
-        </View>
-      </LinearGradient>
-
-      {/* Medication level */}
-      <SectionTitle>Medication level</SectionTitle>
-      <Card>
-        {doseLogs.length === 0 ? (
-          <Text variant="body" tone="secondary">
-            Log your first dose and your live medication level appears here.
-          </Text>
-        ) : (
-          <>
-            <View style={{ flexDirection: 'row', gap: spacing.lg }}>
-              <View style={{ width: 110 }}>
-                <Text variant="caption" tone="secondary">
-                  Right now
-                </Text>
-                <Text variant="hero" tone="primary">
-                  {today.medicationLevel}%
-                </Text>
-                <Text variant="micro" tone="tertiary">
-                  Active in your system
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                {peakLabel ? (
-                  <View
-                    style={{
-                      alignSelf: 'center',
-                      paddingHorizontal: spacing.md,
-                      paddingVertical: 3,
-                      borderRadius: radius.pill,
-                      backgroundColor: c.primarySoft,
-                      marginBottom: spacing.xs,
-                    }}
-                  >
-                    <Text variant="micro" tone="primary">
-                      Peak {peakLabel}
-                    </Text>
-                  </View>
-                ) : null}
-                <LineChart
-                  data={miniCurve}
-                  width={chartWidth - 110 - spacing.lg}
-                  height={84}
-                  domain={[0, 110]}
-                  showLastPoint={false}
-                />
-              </View>
-            </View>
-            <View style={{ marginTop: spacing.lg }}>
-              <Meter percent={today.medicationLevel} />
-            </View>
-          </>
-        )}
-      </Card>
 
       {/* PK curve — blurred for free users */}
       <SectionTitle
@@ -590,56 +433,6 @@ export default function MedicationTab() {
         </Card>
       </ProGate>
 
-      {/* Dose history */}
-      <SectionTitle
-        action={
-          doseLogs.length > 5 ? (
-            <Pressable onPress={() => setShowAllHistory((v) => !v)}>
-              <Text variant="caption" tone="primary">
-                {showAllHistory ? 'Show less' : 'View all ›'}
-              </Text>
-            </Pressable>
-          ) : undefined
-        }
-      >
-        Dose history
-      </SectionTitle>
-      {doseLogs.length === 0 ? (
-        <Card>
-          <Text variant="body" tone="secondary">
-            No doses logged yet. Tap “Log dose taken” above after your injection.
-          </Text>
-        </Card>
-      ) : (
-        <Card>
-          {(showAllHistory ? doseLogs : doseLogs.slice(0, 5)).map((l, i) => (
-            <View
-              key={l.id}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.md,
-                paddingVertical: spacing.md,
-                borderTopWidth: i === 0 ? 0 : 1,
-                borderTopColor: c.border,
-              }}
-            >
-              <Ionicons name="checkmark-circle" size={20} color={c.primary} />
-              <Text variant="body" style={{ flex: 1 }}>
-                {new Date(l.at).toLocaleDateString(undefined, {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-                })}
-              </Text>
-              <Text variant="bodyStrong">{l.value} mg</Text>
-              <Text variant="caption" tone="tertiary">
-                {new Date(l.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-              </Text>
-            </View>
-          ))}
-        </Card>
-      )}
     </Screen>
   );
 }

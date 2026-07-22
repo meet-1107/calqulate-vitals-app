@@ -9,7 +9,6 @@ import { MedicationHero, OutlookRow } from '../../src/components/MedicationHero'
 import { LogoLockup } from '../../src/components/Logo';
 import { TodayBriefing } from '../../src/components/TodayBriefing';
 import { PKChart } from '../../src/components/PKChart';
-import { ProGate } from '../../src/components/Pro';
 import { RangePicker } from '../../src/components/RangePicker';
 import { ScoreCard } from '../../src/components/ScoreCard';
 import { Screen } from '../../src/components/Screen';
@@ -29,7 +28,6 @@ import {
   changeOverDays,
   computeToday,
   goalProgress,
-  todayForecast,
   totalChange,
   weightSeries,
 } from '../../src/lib/insights';
@@ -159,7 +157,6 @@ export default function Home() {
   const score = useMemo(() => computeScore(profile, logs, at), [profile, logs, at]);
   const scorePrev = useMemo(() => computeScore(profile, logs, at - DAY), [profile, logs, at]);
   const comp = useMemo(() => computeBodyComp(profile, logs), [profile, logs]);
-  const forecast = useMemo(() => todayForecast(profile, logs, at), [profile, logs, at]);
   const week = changeOverDays(logs, 7);
   const progress = goalProgress(profile, logs);
   const total = totalChange(profile, logs);
@@ -234,12 +231,6 @@ export default function Home() {
   const scoreDelta = score.total - scorePrev.total;
   const missionTarget = Math.min(100, score.total + score.available);
 
-  const coachChecklist =
-    forecast.phase === 'peak' || forecast.phase === 'rising'
-      ? ['High protein meals', 'Strength training', 'Hydration focus']
-      : forecast.phase === 'declining'
-        ? ['Plan meals ahead', 'Protein at breakfast', 'Keep walks going']
-        : ['Protein-heavy breakfast', 'Water before meals', 'Early bedtime'];
 
   return (
     <Screen scroll>
@@ -767,44 +758,6 @@ export default function Home() {
           </Card>
         </>
       ) : null}
-
-      <SectionTitle>AI Coach</SectionTitle>
-      <ProGate feature="glp1.day-forecast">
-        <Card style={{ gap: spacing.md }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-            <View
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: radius.pill,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: c.primarySoft,
-              }}
-            >
-              <Ionicons name="sparkles" size={18} color={c.primary} />
-            </View>
-            <Text variant="body" style={{ flex: 1 }}>
-              {forecast.phase !== 'none' ? forecast.headline : 'Log your first dose and I can forecast your days.'}
-            </Text>
-          </View>
-          {forecast.phase !== 'none' ? (
-            <View style={{ gap: spacing.sm, marginLeft: 36 + spacing.md }}>
-              <Text variant="micro" tone="tertiary" style={{ textTransform: 'uppercase' }}>
-                Great day for
-              </Text>
-              {coachChecklist.map((item) => (
-                <View key={item} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Ionicons name="checkmark-circle" size={16} color={c.primary} />
-                  <Text variant="caption" tone="secondary">
-                    {item}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </Card>
-      </ProGate>
 
     </Screen>
   );
