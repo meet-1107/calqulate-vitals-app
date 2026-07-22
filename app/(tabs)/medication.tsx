@@ -8,6 +8,7 @@ import { LineChart, Meter } from '../../src/components/charts';
 import { PKChart } from '../../src/components/PKChart';
 import { ProBlur } from '../../src/components/ProBlur';
 import { ProGate } from '../../src/components/Pro';
+import { DoseTimeline, SideEffectList } from '../../src/components/DoseTimeline';
 import { MedicationHero } from '../../src/components/MedicationHero';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
@@ -16,6 +17,12 @@ import { computeToday } from '../../src/lib/insights';
 import { getMedication } from '../../src/lib/medications';
 import { levelSeries } from '../../src/lib/pk';
 import { medicationCycle } from '../../src/lib/cycle';
+import {
+  daysOnCurrentDose,
+  daysSinceSymptom,
+  doseTimeline,
+  sideEffects,
+} from '../../src/lib/medicationLog';
 import {
   SITES,
   nextSite,
@@ -42,6 +49,10 @@ export default function MedicationTab() {
   const now = Date.now();
 
   const cycle = useMemo(() => medicationCycle(profile, logs, now), [profile, logs, now]);
+  const timeline = useMemo(() => doseTimeline(profile, logs), [profile, logs]);
+  const effects = useMemo(() => sideEffects(profile, logs, 30, now), [profile, logs, now]);
+  const onDose = useMemo(() => daysOnCurrentDose(profile, logs, now), [profile, logs, now]);
+  const sinceSymptom = useMemo(() => daysSinceSymptom(logs, now), [logs, now]);
   const rotation = useMemo(
     () => ({
       next: nextSite(logs),
@@ -142,6 +153,50 @@ export default function MedicationTab() {
           </Card>
         ) : null}
       </View>
+
+      {/* Side effects: what the medication is actually doing to this person. */}
+      <SectionTitle
+        action={
+          <Pressable onPress={() => router.push({ pathname: '/quick-add', params: { kind: 'symptom' } })}>
+            <Text variant="caption" tone="primary">
+              Check in
+            </Text>
+          </Pressable>
+        }
+      >
+        Side effects
+      </SectionTitle>
+      <Card style={{ gap: spacing.md }}>
+        <SideEffectList effects={effects} />
+        {sinceSymptom != null && effects.length > 0 ? (
+          <Text variant="micro" tone="tertiary">
+            Last reported {sinceSymptom === 0 ? 'today' : `${sinceSymptom} days ago`}.
+          </Text>
+        ) : null}
+      </Card>
+
+      {/* Dose history: the shape of the treatment, not a list of rows. */}
+      <SectionTitle
+        action={
+          onDose != null ? (
+            <Text variant="caption" tone="secondary">
+              {onDose}d on {cycle.doseMg} mg
+            </Text>
+          ) : undefined
+        }
+      >
+        Dose history
+      </SectionTitle>
+      <Card>
+        <DoseTimeline events={showAllHistory ? timeline : timeline.slice(0, 6)} />
+        {timeline.length > 6 ? (
+          <Pressable onPress={() => setShowAllHistory((v) => !v)} style={{ marginTop: spacing.lg }}>
+            <Text variant="caption" tone="primary">
+              {showAllHistory ? 'Show less' : `Show all ${timeline.length} doses`}
+            </Text>
+          </Pressable>
+        ) : null}
+      </Card>
 
       {cycle.route === 'injection' ? (
         <>
