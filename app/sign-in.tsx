@@ -6,7 +6,8 @@ import { Button } from '../src/components/Button';
 import { Field } from '../src/components/Field';
 import { Screen } from '../src/components/Screen';
 import { Text } from '../src/components/Text';
-import { sendPasswordReset, signIn } from '../src/lib/auth';
+import { GoogleButton, OrDivider } from '../src/components/GoogleButton';
+import { sendPasswordReset, signIn, type Session } from '../src/lib/auth';
 import { useProfile } from '../src/store/profile';
 import { useColors } from '../src/theme/ThemeProvider';
 import { radius, spacing } from '../src/theme';
@@ -33,7 +34,13 @@ export default function SignIn() {
         return;
       }
 
-      const { session } = result;
+      await land(result.session);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const land = async (session: Session) => {
       patchProfile({
         signedIn: true,
         userId: session.userId,
@@ -47,9 +54,6 @@ export default function SignIn() {
       // user on a new device does not get sent back through onboarding.
       await syncWithRemote(session.userId);
       router.replace('/');
-    } finally {
-      setBusy(false);
-    }
   };
 
   const reset = async () => {
@@ -81,6 +85,8 @@ export default function SignIn() {
         <Text variant="title">Welcome back</Text>
 
         <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
+          <GoogleButton onSuccess={land} onError={setError} label="Sign in with Google" />
+          <OrDivider />
           <Field
             label="Email"
             value={email}

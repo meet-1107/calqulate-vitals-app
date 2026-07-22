@@ -94,8 +94,17 @@ function nextDoseTime(
   intervalHours: number,
   now: number,
 ): number | null {
-  // An explicit schedule from onboarding wins while it is still ahead of us.
-  if (profile.nextInjectionAt && profile.nextInjectionAt > now) return profile.nextInjectionAt;
+  // An explicit schedule from onboarding wins while it is still ahead of us —
+  // but onboarding stores a calendar date, which lands at midnight. Applying
+  // the chosen reminder hour stops the card reading "Thursday 12:00 am" for
+  // someone who picked 9:00 AM.
+  if (profile.nextInjectionAt && profile.nextInjectionAt > now) {
+    const scheduled = new Date(profile.nextInjectionAt);
+    if (scheduled.getHours() === 0 && scheduled.getMinutes() === 0) {
+      scheduled.setHours(profile.injectionHour, 0, 0, 0);
+    }
+    if (scheduled.getTime() > now) return scheduled.getTime();
+  }
 
   if (lastAt != null) return lastAt + intervalHours * HOUR;
 

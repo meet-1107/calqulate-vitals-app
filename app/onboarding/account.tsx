@@ -7,7 +7,8 @@ import { Field } from '../../src/components/Field';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { OnboardingHeader } from '../../src/components/OnboardingHeader';
-import { signUp } from '../../src/lib/auth';
+import { GoogleButton, OrDivider } from '../../src/components/GoogleButton';
+import { signUp, type Session } from '../../src/lib/auth';
 import { isSupabaseConfigured } from '../../src/lib/supabase';
 import { useProfile } from '../../src/store/profile';
 import { useColors } from '../../src/theme/ThemeProvider';
@@ -41,7 +42,13 @@ export default function Account() {
         return;
       }
 
-      const { session } = result;
+      await land(result.session);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const land = async (session: Session) => {
       patchProfile({
         signedIn: true,
         userId: session.userId,
@@ -53,9 +60,6 @@ export default function Account() {
       });
       await syncWithRemote(session.userId);
       router.push('/onboarding/premium');
-    } finally {
-      setBusy(false);
-    }
   };
 
   return (
@@ -75,7 +79,12 @@ export default function Account() {
             : 'Running offline — data stays on this device only.'}
         </Text>
 
-        <View style={{ marginTop: spacing.xxl, gap: spacing.lg }}>
+        <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
+          <GoogleButton onSuccess={land} onError={setError} label="Continue with Google" />
+          <OrDivider />
+        </View>
+
+        <View style={{ marginTop: spacing.lg, gap: spacing.lg }}>
           <Field label="First name" value={name} onChangeText={setName} autoCapitalize="words" />
           <Field
             label="Email"

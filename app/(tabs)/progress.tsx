@@ -125,7 +125,6 @@ export default function Progress() {
         intelligence={learned}
         days={day}
         since={firstLog}
-        spark={weightSeries(logs).slice(-20)}
       />
 
       {/* The narrative line — the thing a chart cannot say. */}

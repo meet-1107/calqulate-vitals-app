@@ -147,17 +147,21 @@ export function Ring({ percent, size = 128, stroke = 12, color, label, caption }
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={c.track} strokeWidth={stroke} fill="none" />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          stroke={tint}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={`${(circumference * clamped) / 100} ${circumference}`}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
+        {/* A round cap on a zero-length arc still paints a dot, so 0% drew a
+            stray mark at twelve o'clock. Below half a percent, draw nothing. */}
+        {clamped >= 0.5 ? (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={tint}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            fill="none"
+            strokeDasharray={`${(circumference * clamped) / 100} ${circumference}`}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        ) : null}
       </Svg>
       <Text variant="title">{label ?? `${Math.round(clamped)}%`}</Text>
       {caption ? (

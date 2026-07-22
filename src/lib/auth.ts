@@ -9,6 +9,8 @@
  * marks that case — nothing syncs, and the UI says so.
  */
 
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { isAdminEmail, supabase } from './supabase';
 
 export type Session = {
@@ -93,6 +95,64 @@ export async function sendPasswordReset(email: string): Promise<AuthResult | { o
     redirectTo: 'calqulate://reset-password',
   });
   return error ? { ok: false, error: humanize(error.message) } : { ok: true };
+}
+
+/**
+ * Google sign-in, through Supabase OAuth.
+ *
+ * Uses the browser flow rather than a native Google SDK: it needs no extra
+ * native module, works in a development build and a store build alike, and
+ * Supabase already brokers the token exchange. Supabase returns an authorise
+ * URL, the system browser handles consent, and the callback comes back to the
+ * app's own scheme carrying the session.
+ *
+ * Requires Google to be enabled in Supabase (Authentication -> Providers) and
+ * the redirect URL added to the allow-list. Without that the provider returns
+ * an error, which is surfaced rather than swallowed.
+ */
+export async function signInWithGoogle(): Promise<AuthResult> {
+  if (!supabase) {
+    return { ok: false, error: 'Connect Supabase before using Google sign-in.' };
+  }
+
+  try {
+    const redirectTo = makeRedirectUri({ scheme: 'calqulate', path: 'auth-callback' });
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error || !data?.url) {
+      return { ok: false, error: humanize(error?.message ?? 'Google sign-in is unavailable.') };
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success' || !result.url) {
+      // Dismissing the browser is a choice, not a failure worth shouting about.
+      return { ok: false, error: '' };
+    }
+
+    // Supabase returns the tokens in the URL fragment.
+    const fragment = result.url.split('#')[1] ?? '';
+    const params = new URLSearchParams(fragment);
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    if (!access_token || !refresh_token) {
+      return { ok: false, error: 'Google did not return a session. Please try again.' };
+    }
+
+    const { data: session, error: sessionError } = await supabase.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+    if (sessionError || !session.user) {
+      return { ok: false, error: humanize(sessionError?.message ?? 'Could not start your session.') };
+    }
+
+    return { ok: true, session: await hydrate(session.user.id, session.user.email!) };
+  } catch {
+    return { ok: false, error: 'Google sign-in could not complete. Check your connection.' };
+  }
 }
 
 /** Restores a session on cold start, or null when signed out. */
