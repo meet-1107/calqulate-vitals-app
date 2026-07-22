@@ -7,7 +7,6 @@ import { Meter, Ring, StackedBar } from '../../src/components/charts';
 import { CoachCard } from '../../src/components/CoachCard';
 import { TodayBriefing } from '../../src/components/TodayBriefing';
 import { PKChart } from '../../src/components/PKChart';
-import { LogoLockup } from '../../src/components/Logo';
 import { ProGate } from '../../src/components/Pro';
 import { RangePicker } from '../../src/components/RangePicker';
 import { ScoreCard } from '../../src/components/ScoreCard';
@@ -237,43 +236,51 @@ export default function Home() {
 
   return (
     <Screen scroll>
+      {/* One header row instead of four stacked blocks.
+          The avatar carries identity and the route to Profile, the greeting is
+          context, and the coach's verdict is the message. The logo lives on the
+          splash — a dashboard does not need to tell you which app you are in,
+          and it was costing a whole row above the fold. */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: spacing.md,
           marginTop: spacing.sm,
           marginBottom: spacing.lg,
         }}
       >
-        <LogoLockup size={30} />
-        <Pressable onPress={() => router.push('/(tabs)/profile')} hitSlop={10}>
+        <Pressable
+          onPress={() => router.push('/(tabs)/profile')}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+        >
           <View
             style={{
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
               borderRadius: radius.pill,
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: c.primarySoft,
             }}
           >
-            <Text variant="caption" tone="primary">
+            <Text variant="bodyStrong" tone="primary">
               {(profile.name || profile.email || '?').charAt(0).toUpperCase()}
             </Text>
           </View>
         </Pressable>
-      </View>
 
-      {/* Greeting sits above the headline: the name is context, the verdict is
-          the message. */}
-      <View style={{ marginBottom: spacing.md }}>
-        <Text variant="body" tone="secondary">
-          {greeting()}, {profile.name || 'there'} 👋
-        </Text>
-        <Text variant="hero" style={{ marginTop: 2 }}>
-          {coach.headline}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text variant="caption" tone="secondary">
+            {greeting()}, {profile.name || 'there'}
+          </Text>
+          {/* Title, not hero: at 40px the verdict swallowed the fold. */}
+          <Text variant="title" numberOfLines={2} style={{ marginTop: 1 }}>
+            {coach.headline}
+          </Text>
+        </View>
       </View>
 
       <View style={{ marginBottom: spacing.lg }}>
