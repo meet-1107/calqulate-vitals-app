@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Card, SectionTitle } from '../../src/components/Card';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
+import { VitalsCard } from '../../src/components/VitalsCard';
 import { signOut } from '../../src/lib/auth';
 import { isSupabaseConfigured } from '../../src/lib/supabase';
 import { useProfile } from '../../src/store/profile';
@@ -17,7 +18,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
     title: 'Your plan',
     rows: [
       { icon: 'flag-outline', label: 'Goals', href: '/settings' },
-      { icon: 'sparkles-outline', label: 'Subscription', href: '/paywall' },
+      { icon: 'options-outline', label: 'Compare plans', href: '/plans' },
     ],
   },
   {
@@ -110,6 +111,10 @@ export default function ProfileTab() {
             ? `Synced · ${logs.length} entries`
             : 'Offline mode · data stays on this device'}
       </Text>
+
+      <View style={{ marginTop: spacing.lg }}>
+        <VitalsCard isPro={profile.isPro} />
+      </View>
 
       {SECTIONS.map((section) => (
         <View key={section.title}>
