@@ -6,6 +6,7 @@
  */
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SYMPTOM_ARTICLE_BY_LABEL } from '../src/lib/care/content';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import {
@@ -209,6 +210,13 @@ export default function QuickAdd() {
 function QuickAddInner() {
   const c = useColors();
   const router = useRouter();
+  const careLinkFor = (symptoms: string[]) => {
+    for (const name of symptoms) {
+      const id = SYMPTOM_ARTICLE_BY_LABEL[name];
+      if (id) return id;
+    }
+    return null;
+  };
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ kind?: string }>();
@@ -869,6 +877,36 @@ function QuickAddInner() {
                 onChangeText={setNote}
                 placeholder="Add any additional notes…"
               />
+
+              {/* The Care link for the first logged symptom that has a guide —
+                  the "I feel sick, now what?" path, one tap from logging it. */}
+              {!feelingFine && careLinkFor(picked) ? (
+                <Pressable
+                  onPress={() => {
+                    const id = careLinkFor(picked)!;
+                    save('symptom', severity, {
+                      label: picked.join(', '),
+                      note: note.trim() || undefined,
+                    });
+                    router.push({ pathname: '/care/[id]', params: { id } });
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.sm,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.lg,
+                    borderRadius: radius.pill,
+                    backgroundColor: ACCENT.symptom.soft,
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  <Ionicons name="bulb-outline" size={16} color={ACCENT.symptom.tint} />
+                  <Text variant="caption" style={{ color: ACCENT.symptom.tint }}>
+                    Save & see what helps with {picked[0].toLowerCase()}
+                  </Text>
+                </Pressable>
+              ) : null}
 
               <SaveButton
                 kind="symptom"

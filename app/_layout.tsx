@@ -22,6 +22,7 @@ function Navigator() {
         }}
       >
         <Stack.Screen name="index" options={{ animation: 'fade' }} />
+        <Stack.Screen name="care/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="quick-add" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="paywall" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="plans" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

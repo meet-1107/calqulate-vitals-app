@@ -12,6 +12,7 @@ const ICONS: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionico
   index: ['home', 'home-outline'],
   progress: ['trending-up', 'trending-up-outline'],
   medication: ['medkit', 'medkit-outline'],
+  care: ['heart', 'heart-outline'],
   profile: ['person', 'person-outline'],
 };
 
@@ -19,6 +20,7 @@ const LABELS: Record<string, string> = {
   index: 'Home',
   progress: 'Progress',
   medication: 'Medication',
+  care: 'Care',
   profile: 'Profile',
 };
 
@@ -28,13 +30,15 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // The FAB sits between the second and third tab.
-  const left = state.routes.slice(0, 2);
-  const right = state.routes.slice(2);
+  // Profile is registered for navigation but hidden from the bar (href: null),
+  // so drop it before splitting the row around the FAB.
+  const visible = state.routes.filter((r) => r.name !== 'profile');
+  const left = visible.slice(0, 2);
+  const right = visible.slice(2);
 
   const renderTab = (route: (typeof state.routes)[number]) => {
-    const index = state.routes.findIndex((r) => r.key === route.key);
-    const focused = state.index === index;
+    const routeIndex = state.routes.findIndex((r) => r.key === route.key);
+    const focused = state.index === routeIndex;
     const [active, inactive] = ICONS[route.name] ?? ICONS.index;
 
     return (
@@ -108,7 +112,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="progress" />
       <Tabs.Screen name="medication" />
-      <Tabs.Screen name="profile" />
+      <Tabs.Screen name="care" />
+      <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );
 }
